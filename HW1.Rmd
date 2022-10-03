@@ -15,9 +15,58 @@ Regression models in ML predict a numerical, qualitative variable. Classificatio
 Regression ML metrics: Training MSE, expected Test MSE, 
 Classification ML metrics: Training Error Rate, Bayes Error Rate 
 
+##Q4
+Descriptive models are used visually empahsize a trend in data.
+Predictive models attempt to make a prediction with as little reducible error as possible.
+Inferential models attempt to test theories and  find the relationship between the outcome and the predictors, which may be causal.
+(Slide 39, Lec 1)
+
+##Q5
+Mechanistic models assume the statistical model follows a parametric form, following some theory to make predictions. More parameters will make the model more flexible. Empirically driven models make no assumptions about the structure of the statistical model and analyze the data without a base theory. These models require more observations than parametric models, and are more flexible by nature. Both models have to avoid overfitting.
+
+Mechanistic models are easier to understand because it is clear to see how the predictor variables impact the outcome in a parametric form.
+
+The bias-variance trade describes the inverse relationship between lowering variance and lowering bias. Finding a method to minimize both of these values as much as possible will result in the lowest expected test MSE, which is the sum of the variance, bias squared, and irreducible error. The lower the expected test MSE, the better the model is espected to perform.
+
+##Q6
+The first scenario is a predictive model. You are given some information which can be used as predictors for an outcome. The goal is to see how well you can predict a voter's choice given their data.
+
+The second scenario is an inferential model. In this case, the goal is to analyze how voter contact with the candidate affects their voting (analyzes the relationship between the predictors and the outcome).
+
 ```{r}
+library(tidyverse)
+```
+```{r}
+#1
+mpg1 <- mpg
+hist(mpg1$hwy)
+```
+The data on highway mpg is bimodal with peaks between 15-20 mpg and 25-30 mpg. It is skewed right. The range is 10 to 45 mpg. The median is between 20 and 25.
+
+```{r}
+#2
+ggplot(mpg1, aes(x=hwy, y=cty)) + geom_point()
+```
+There is a strong positive correlation between city mpg and highway mpg. This suggests that cars that have better mpg in one area will also have better mpg in the other.
+
+```{r}
+#3
+p <- ggplot(mpg1, aes(x=fct_infreq(manufacturer)))+
+  geom_bar( width=0.7, fill="steelblue")+
+  theme_minimal()
+
+p + coord_flip()
 
 ```
+Dodge produced the most cars. Lincoln produced the least.
+
+```{r}
+#4
+box1 <- ggplot(mpg1, aes(group = cyl, x = cyl, y=hwy)) + 
+  geom_boxplot()
+box1
+```
+As the number of cylinders in a model's engine increases, the highway mpg tends to decrease.
 
 
 ```{r setup, include=FALSE}
@@ -31,7 +80,8 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r cars}
-summary(cars)
+mpg1
+
 ```
 
 ## Including Plots
