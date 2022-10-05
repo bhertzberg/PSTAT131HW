@@ -45,9 +45,16 @@ summary(abalone$age)
 
 ### Question 2
 
-Split the abalone data into a training set and a testing set. Use stratified sampling. You should decide on appropriate percentages for splitting the data.
 
-*Remember that you'll need to set a seed at the beginning of the document to reproduce your results.*
+```{r}
+set.seed(619)
+
+ab_split <- initial_split(abalone, prop = 0.80,
+                                strata = age)
+ab_train <- training(ab_split)
+ab_test <- testing(ab_split)
+```
+
 
 ### Question 3
 
