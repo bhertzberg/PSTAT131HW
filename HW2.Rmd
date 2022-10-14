@@ -77,37 +77,27 @@ Steps for your recipe:
 You'll need to investigate the `tidymodels` documentation to find the appropriate step functions to use.
 
 ```{r}
-abRecipe <- recipe(age ~ type + longest_shell + diameter + height + whole_weight + shucked_weight + viscera_weight + shell_weight, data = ab_train) 
-  
+abRecipe <- recipe(age ~ type + longest_shell + diameter + height + whole_weight + shucked_weight + viscera_weight + shell_weight, data = ab_train)%>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_normalize(all_numeric_predictors()) %>%
 
-  
-summary(abRecipe)
-```
 
-```{r}
-interact1 <- abRecipe %>%
-  step_dummy(all_nominal_predictors())%>%
-
-  step_interact(terms = ~ type_I:shucked_weight)%>%
-  step_interact(terms = ~ type_M:shucked_weight)%>%
+  step_interact(terms = ~ starts_with("type"):shucked_weight) %>%
   step_interact(terms = ~ longest_shell:diameter) %>%
-  step_interact(terms = ~ shucked_weight:shell_weight) 
+  step_interact(terms = ~ shucked_weight:shell_weight)
 
-
-  
-interact1 <- prep(interact1, training = ab_train)
-
-data1 <- bake(interact1, ab_train)
-
-```
-```{r}
-data1
 ```
 
 
 ### Question 4
 
 Create and store a linear regression object using the `"lm"` engine.
+
+```{r}
+lm_model <- linear_reg() %>% 
+  set_engine("lm")
+```
+
 
 ### Question 5
 
@@ -117,9 +107,27 @@ Now:
 2.  add the model you created in Question 4, and
 3.  add the recipe that you created in Question 3.
 
+```{r}
+lm_wflow <- workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(abRecipe)
+```
+
+
 ### Question 6
 
 Use your `fit()` object to predict the age of a hypothetical female abalone with longest_shell = 0.50, diameter = 0.10, height = 0.30, whole_weight = 4, shucked_weight = 1, viscera_weight = 2, shell_weight = 1.
+
+```{r}
+lm_fit <- fit(lm_wflow, ab_train)
+```
+
+```{r}
+vals <- data.frame(type = c('F'), longest_shell = c(0.5), diameter=c(0.1), height =c(0.3), whole_weight=c(4), shucked_weight = c(1), viscera_weight=(2), shell_weight=c(1))
+
+predict(lm_fit, vals)
+```
+The predicted age for the values listed above is 24.36 years.
 
 ### Question 7
 
@@ -128,6 +136,20 @@ Now you want to assess your model's performance. To do this, use the `yardstick`
 1.  Create a metric set that includes *R^2^*, RMSE (root mean squared error), and MAE (mean absolute error).
 2.  Use `predict()` and `bind_cols()` to create a tibble of your model's predicted values from the **training data** along with the actual observed ages (these are needed to assess your model's performance).
 3.  Finally, apply your metric set to the tibble, report the results, and interpret the *R^2^* value.
+
+```{r}
+ab_metrics <- metric_set(rsq, rmse, mae)
+
+ab_tr_res <- predict(lm_fit, new_data = ab_train %>% select(-age))
+
+ab_tr_res <- bind_cols(ab_tr_res, ab_train %>% select(age))
+
+ab_metrics(ab_tr_res, truth = age, 
+                estimate = .pred)
+```
+
+Rsq = 0.550, RMSE = 2.147, MAE = 1.541
+The Rsq = 0.550 value informs us that about 55% of the variability in abalone age can be explained by the predictor variables used in the model above.
 
 ### Required for 231 Students
 
