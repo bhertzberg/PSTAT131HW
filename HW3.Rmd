@@ -1,0 +1,100 @@
+---
+title: "HW3"
+author: "Ben Hertzberg"
+date: '2022-10-26'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+titanic <- read.csv('./data/titanic.csv')
+library(tidymodels)
+library(tidyverse)
+library(ggplot2)
+library(corrr)
+```
+
+
+Notice that `survived` and `pclass` should be changed to factors. When changing `survived` to a factor, you may want to reorder the factor so that *"Yes"* is the first level.
+
+Make sure you load the `tidyverse` and `tidymodels`!
+
+*Remember that you'll need to set a seed at the beginning of the document to reproduce your results.*
+
+### Question 1
+
+```{r}
+set.seed(619)
+
+ttnc_split <- initial_split(titanic, prop = 0.80,
+                                strata = survived)
+ttnc_train <- training(ttnc_split)
+ttnc_test <- testing(ttnc_split)
+```
+
+```{r}
+ttnc_train
+```
+
+There is some data missing for the age and cabin variables. Some of the data for the ticket variale seems to be formatted incorrectly.
+
+It is a good idea to use stratified sampling for this data because the model should be exposed to a reasonable number of observations for every possibility of 'survived'. Without stratification, it is possible that one possibility of the outcome of 'survive' will be overly sampled, which could confuse the model.
+
+### Question 2
+
+Using the **training** data set, explore/describe the distribution of the outcome variable `survived`.
+
+```{r}
+ttnc_train %>% 
+  ggplot(aes(x = survived)) +
+  geom_bar()
+```
+
+The outcome variable, survived, has more 'no' observations than 'yes' observations. However, there is a large number of both possibilities present, so the data should be fine for training.
+
+### Question 3
+
+Using the **training** data set, create a correlation matrix of all continuous variables. Create a visualization of the matrix, and describe any patterns you see. Are any predictors correlated with each other? Which ones, and in which direction?
+
+```{r}
+cor_ttnc <- ttnc_train %>%
+  select(age, sib_sp, parch, fare) %>%
+  correlate()
+rplot(cor_ttnc)
+
+```
+
+There is a slight negative correlation between age and sib_sp, and a slight positive correlation between sib_sp and parch.
+
+### Question 4
+
+Using the **training** data, create a recipe predicting the outcome variable `survived`. Include the following predictors: ticket class, sex, age, number of siblings or spouses aboard, number of parents or children aboard, and passenger fare.
+
+```{r}
+ttnc_rec <- recipe(survived ~ pclass + sex + age + sib_sp + parch + fare, data = ttnc_train) %>% 
+  step_impute_linear() %>% 
+  step_dummy() %>% 
+  step_interact(terms = ~sex:fare) %>% 
+  step_interact(terms = ~age:fare)
+  
+```
+
+
+Recall that there were missing values for `age`. To deal with this, add an imputation step using `step_impute_linear()`. Next, use `step_dummy()` to **dummy** encode categorical predictors. Finally, include interactions between:
+
+-   Sex and passenger fare, and
+-   Age and passenger fare.
+
+You'll need to investigate the `tidymodels` documentation to find the appropriate step functions to use.
+
+### Question 5
+
+Specify a **logistic regression** model for classification using the `"glm"` engine. Then create a workflow. Add your model and the appropriate recipe. Finally, use `fit()` to apply your workflow to the **training** data.
+
+***Hint: Make sure to store the results of `fit()`. You'll need them later on.***
+
