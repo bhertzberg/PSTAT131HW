@@ -16,7 +16,12 @@ titanic <- read.csv('./data/titanic.csv')
 library(tidymodels)
 library(tidyverse)
 library(ggplot2)
+library(discrim)
+library(poissonreg)
 library(corrr)
+library(klaR)
+tidymodels_prefer()
+
 ```
 
 
@@ -63,7 +68,7 @@ Using the **training** data set, create a correlation matrix of all continuous v
 
 ```{r}
 cor_ttnc <- ttnc_train %>%
-  select(age, sib_sp, parch, fare) %>%
+  dplyr::select(age, sib_sp, parch, fare) %>%
   correlate()
 rplot(cor_ttnc)
 
@@ -78,23 +83,106 @@ Using the **training** data, create a recipe predicting the outcome variable `su
 ```{r}
 ttnc_rec <- recipe(survived ~ pclass + sex + age + sib_sp + parch + fare, data = ttnc_train) %>% 
   step_impute_linear() %>% 
-  step_dummy() %>% 
-  step_interact(terms = ~sex:fare) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_interact(terms = ~starts_with("sex"):fare) %>% 
   step_interact(terms = ~age:fare)
   
 ```
 
 
-Recall that there were missing values for `age`. To deal with this, add an imputation step using `step_impute_linear()`. Next, use `step_dummy()` to **dummy** encode categorical predictors. Finally, include interactions between:
-
--   Sex and passenger fare, and
--   Age and passenger fare.
-
-You'll need to investigate the `tidymodels` documentation to find the appropriate step functions to use.
-
 ### Question 5
 
-Specify a **logistic regression** model for classification using the `"glm"` engine. Then create a workflow. Add your model and the appropriate recipe. Finally, use `fit()` to apply your workflow to the **training** data.
+```{r}
+log_reg <- logistic_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("classification")
 
-***Hint: Make sure to store the results of `fit()`. You'll need them later on.***
+log_wkflow <- workflow() %>% 
+  add_model(log_reg) %>% 
+  add_recipe(ttnc_rec)
+
+log_fit <- fit(log_wkflow, ttnc_train)
+```
+
+### Question 6
+
+```{r}
+lda_mod <- discrim_linear() %>% 
+  set_mode("classification") %>% 
+  set_engine("MASS")
+
+lda_wkflow <- workflow() %>% 
+  add_model(lda_mod) %>% 
+  add_recipe(ttnc_rec)
+
+lda_fit <- fit(lda_wkflow, ttnc_train)
+```
+
+### Question 7
+
+```{r}
+qda_mod <- discrim_quad() %>% 
+  set_mode("classification") %>% 
+  set_engine("MASS")
+
+qda_wkflow <- workflow() %>% 
+  add_model(qda_mod) %>% 
+  add_recipe(ttnc_rec)
+
+qda_fit <- fit(qda_wkflow, ttnc_train)
+```
+
+
+### Question 8
+
+**Repeat Question 5**, but this time specify a naive Bayes model for classification using the `"klaR"` engine. Set the `usekernel` argument to `FALSE`.
+
+```{r}
+nb_mod <- naive_Bayes() %>% 
+  set_mode("classification") %>% 
+  set_engine("klaR") %>% 
+  set_args(usekernel = FALSE) 
+
+nb_wkflow <- workflow() %>% 
+  add_model(nb_mod) %>% 
+  add_recipe(ttnc_rec)
+
+nb_fit <- fit(nb_wkflow, ttnc_train)
+
+```
+
+```{r}
+lda_wkflow
+```
+
+### Question 9
+
+Now you've fit four different models to your training data.
+
+Use `predict()` and `bind_cols()` to generate predictions using each of these 4 models and your **training** data. Then use the *accuracy* metric to assess the performance of each of the four models.
+
+```{r}
+predict(log_fit, new_data = ttnc_train, type = 'prob')
+predict(lda_fit, new_data = ttnc_train, type = 'prob')
+predict(qda_fit, new_data = ttnc_train, type = 'prob')
+```
+
+
+```{r}
+log_reg_acc <- augment(log_fit, new_data = ttnc_train) %>% 
+  accuracy(truth = survived, estimate = .pred_class)
+log_rec_acc
+```
+
+
+Which model achieved the highest accuracy on the training data?
+
+### Question 10
+
+Fit the model with the highest training accuracy to the **testing** data. Report the accuracy of the model on the **testing** data.
+
+Again using the **testing** data, create a confusion matrix and visualize it. Plot an ROC curve and calculate the area under it (AUC).
+
+How did the model perform? Compare its training and testing accuracies. If the values differ, why do you think this is so?
+
 
