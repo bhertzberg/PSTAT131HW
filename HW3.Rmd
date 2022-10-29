@@ -46,7 +46,7 @@ ttnc_test <- testing(ttnc_split)
 ttnc_train
 ```
 
-There is some data missing for the age and cabin variables. Some of the data for the ticket variale seems to be formatted incorrectly.
+There is some data missing for the age and cabin variables. Some of the data for the ticket variable seems to be formatted incorrectly.
 
 It is a good idea to use stratified sampling for this data because the model should be exposed to a reasonable number of observations for every possibility of 'survived'. Without stratification, it is possible that one possibility of the outcome of 'survive' will be overly sampled, which could confuse the model.
 
@@ -152,7 +152,8 @@ nb_fit <- fit(nb_wkflow, ttnc_train)
 ```
 
 ```{r}
-lda_wkflow
+log_fit %>% 
+  tidy()
 ```
 
 ### Question 9
@@ -168,10 +169,21 @@ predict(qda_fit, new_data = ttnc_train, type = 'prob')
 ```
 
 
-```{r}
-log_reg_acc <- augment(log_fit, new_data = ttnc_train) %>% 
-  accuracy(truth = survived, estimate = .pred_class)
-log_rec_acc
+
+```{r, warning=FALSE}
+log_reg_acc <- augment(log_fit, new_data = ttnc_train) %>%
+  accuracy(truth = factor(survived), estimate = .pred_class)
+log_reg_acc
+
+lda_acc <- augment(lda_fit, new_data = ttnc_train) %>%
+  accuracy(truth = factor(survived), estimate = .pred_class)
+lda_acc
+
+qda_acc <- augment(qda_fit, new_data = ttnc_train) %>%
+  accuracy(truth = factor(survived), estimate = .pred_class)
+qda_acc
+
+
 ```
 
 
