@@ -29,6 +29,12 @@ Notice that `survived` and `pclass` should be changed to factors. When changing 
 
 Make sure you load the `tidyverse` and `tidymodels`!
 
+```{r}
+titanic$survived <- as.factor(titanic$survived)
+titanic$pclass <- as.factor(titanic$pclass)
+```
+
+
 *Remember that you'll need to set a seed at the beginning of the document to reproduce your results.*
 
 ### Question 1
@@ -55,7 +61,7 @@ It is a good idea to use stratified sampling for this data because the model sho
 Using the **training** data set, explore/describe the distribution of the outcome variable `survived`.
 
 ```{r}
-ttnc_train %>% 
+ttnc_train %>%
   ggplot(aes(x = survived)) +
   geom_bar()
 ```
@@ -81,24 +87,27 @@ There is a slight negative correlation between age and sib_sp, and a slight posi
 Using the **training** data, create a recipe predicting the outcome variable `survived`. Include the following predictors: ticket class, sex, age, number of siblings or spouses aboard, number of parents or children aboard, and passenger fare.
 
 ```{r}
-ttnc_rec <- recipe(survived ~ pclass + sex + age + sib_sp + parch + fare, data = ttnc_train) %>% 
-  step_impute_linear() %>% 
-  step_dummy(all_nominal_predictors()) %>% 
-  step_interact(terms = ~starts_with("sex"):fare) %>% 
+ttnc_rec <- recipe(survived ~ pclass + sex + age + sib_sp + parch + fare, data = ttnc_train) %>%
+
+  step_impute_linear() %>%
+  step_dummy(all_nominal_predictors()) %>%  
+  step_normalize(all_numeric_predictors()) %>%
+  step_interact(terms = ~starts_with("sex"):fare) %>%
   step_interact(terms = ~age:fare)
-  
+ 
+ 
 ```
 
 
 ### Question 5
 
 ```{r}
-log_reg <- logistic_reg() %>% 
-  set_engine("glm") %>% 
+log_reg <- logistic_reg() %>%
+  set_engine("glm") %>%
   set_mode("classification")
 
-log_wkflow <- workflow() %>% 
-  add_model(log_reg) %>% 
+log_wkflow <- workflow() %>%
+  add_model(log_reg) %>%
   add_recipe(ttnc_rec)
 
 log_fit <- fit(log_wkflow, ttnc_train)
@@ -107,12 +116,12 @@ log_fit <- fit(log_wkflow, ttnc_train)
 ### Question 6
 
 ```{r}
-lda_mod <- discrim_linear() %>% 
-  set_mode("classification") %>% 
+lda_mod <- discrim_linear() %>%
+  set_mode("classification") %>%
   set_engine("MASS")
 
-lda_wkflow <- workflow() %>% 
-  add_model(lda_mod) %>% 
+lda_wkflow <- workflow() %>%
+  add_model(lda_mod) %>%
   add_recipe(ttnc_rec)
 
 lda_fit <- fit(lda_wkflow, ttnc_train)
@@ -121,12 +130,12 @@ lda_fit <- fit(lda_wkflow, ttnc_train)
 ### Question 7
 
 ```{r}
-qda_mod <- discrim_quad() %>% 
-  set_mode("classification") %>% 
+qda_mod <- discrim_quad() %>%
+  set_mode("classification") %>%
   set_engine("MASS")
 
-qda_wkflow <- workflow() %>% 
-  add_model(qda_mod) %>% 
+qda_wkflow <- workflow() %>%
+  add_model(qda_mod) %>%
   add_recipe(ttnc_rec)
 
 qda_fit <- fit(qda_wkflow, ttnc_train)
@@ -138,13 +147,13 @@ qda_fit <- fit(qda_wkflow, ttnc_train)
 **Repeat Question 5**, but this time specify a naive Bayes model for classification using the `"klaR"` engine. Set the `usekernel` argument to `FALSE`.
 
 ```{r}
-nb_mod <- naive_Bayes() %>% 
-  set_mode("classification") %>% 
-  set_engine("klaR") %>% 
-  set_args(usekernel = FALSE) 
+nb_mod <- naive_Bayes() %>%
+  set_mode("classification") %>%
+  set_engine("klaR") %>%
+  set_args(usekernel = FALSE)
 
-nb_wkflow <- workflow() %>% 
-  add_model(nb_mod) %>% 
+nb_wkflow <- workflow() %>%
+  add_model(nb_mod) %>%
   add_recipe(ttnc_rec)
 
 nb_fit <- fit(nb_wkflow, ttnc_train)
@@ -152,7 +161,7 @@ nb_fit <- fit(nb_wkflow, ttnc_train)
 ```
 
 ```{r}
-log_fit %>% 
+log_fit %>%
   tidy()
 ```
 
@@ -162,7 +171,7 @@ Now you've fit four different models to your training data.
 
 Use `predict()` and `bind_cols()` to generate predictions using each of these 4 models and your **training** data. Then use the *accuracy* metric to assess the performance of each of the four models.
 
-```{r}
+```{r, warning=FALSE}
 predict(log_fit, new_data = ttnc_train, type = 'prob')
 predict(lda_fit, new_data = ttnc_train, type = 'prob')
 predict(qda_fit, new_data = ttnc_train, type = 'prob')
@@ -189,6 +198,8 @@ qda_acc
 
 Which model achieved the highest accuracy on the training data?
 
+
+
 ### Question 10
 
 Fit the model with the highest training accuracy to the **testing** data. Report the accuracy of the model on the **testing** data.
@@ -196,5 +207,3 @@ Fit the model with the highest training accuracy to the **testing** data. Report
 Again using the **testing** data, create a confusion matrix and visualize it. Plot an ROC curve and calculate the area under it (AUC).
 
 How did the model perform? Compare its training and testing accuracies. If the values differ, why do you think this is so?
-
-
