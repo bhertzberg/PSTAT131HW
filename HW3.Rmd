@@ -25,17 +25,11 @@ tidymodels_prefer()
 ```
 
 
-Notice that `survived` and `pclass` should be changed to factors. When changing `survived` to a factor, you may want to reorder the factor so that *"Yes"* is the first level.
-
-Make sure you load the `tidyverse` and `tidymodels`!
-
 ```{r}
 titanic$survived <- as.factor(titanic$survived)
 titanic$pclass <- as.factor(titanic$pclass)
 ```
 
-
-*Remember that you'll need to set a seed at the beginning of the document to reproduce your results.*
 
 ### Question 1
 
@@ -58,7 +52,6 @@ It is a good idea to use stratified sampling for this data because the model sho
 
 ### Question 2
 
-Using the **training** data set, explore/describe the distribution of the outcome variable `survived`.
 
 ```{r}
 ttnc_train %>%
@@ -70,7 +63,6 @@ The outcome variable, survived, has more 'no' observations than 'yes' observatio
 
 ### Question 3
 
-Using the **training** data set, create a correlation matrix of all continuous variables. Create a visualization of the matrix, and describe any patterns you see. Are any predictors correlated with each other? Which ones, and in which direction?
 
 ```{r}
 cor_ttnc <- ttnc_train %>%
@@ -83,8 +75,6 @@ rplot(cor_ttnc)
 There is a slight negative correlation between age and sib_sp, and a slight positive correlation between sib_sp and parch.
 
 ### Question 4
-
-Using the **training** data, create a recipe predicting the outcome variable `survived`. Include the following predictors: ticket class, sex, age, number of siblings or spouses aboard, number of parents or children aboard, and passenger fare.
 
 ```{r}
 ttnc_rec <- recipe(survived ~ pclass + sex + age + sib_sp + parch + fare, data = ttnc_train) %>%
@@ -144,8 +134,6 @@ qda_fit <- fit(qda_wkflow, ttnc_train)
 
 ### Question 8
 
-**Repeat Question 5**, but this time specify a naive Bayes model for classification using the `"klaR"` engine. Set the `usekernel` argument to `FALSE`.
-
 ```{r}
 nb_mod <- naive_Bayes() %>%
   set_mode("classification") %>%
@@ -158,6 +146,12 @@ nb_wkflow <- workflow() %>%
 
 nb_fit <- fit(nb_wkflow, ttnc_train)
 
+
+#Received error during fit:
+# Error in if (any(temp)) stop("Zero variances for at least one class in variables: ", : 
+# missing value where TRUE/FALSE needed
+
+#Tried to Google, reach out to friends, but could not figure it out. Tried to rearrange steps in the recipe, changed variable types, and use different syntax for the naive bayes model.
 ```
 
 ```{r}
@@ -175,6 +169,7 @@ Use `predict()` and `bind_cols()` to generate predictions using each of these 4 
 predict(log_fit, new_data = ttnc_train, type = 'prob')
 predict(lda_fit, new_data = ttnc_train, type = 'prob')
 predict(qda_fit, new_data = ttnc_train, type = 'prob')
+#predict(nb_fit, new_data = ttnc_train, type = 'prob')
 ```
 
 
@@ -192,18 +187,39 @@ qda_acc <- augment(qda_fit, new_data = ttnc_train) %>%
   accuracy(truth = factor(survived), estimate = .pred_class)
 qda_acc
 
+#nb_acc <- augment(nb_fit, new_data = ttnc_train) %>%
+#  accuracy(truth = factor(survived), estimate = .pred_class)
+#nb_acc
+
 
 ```
 
 
-Which model achieved the highest accuracy on the training data?
-
+The logorithmic regression model achieved the highest accuracy on the training data.
 
 
 ### Question 10
 
-Fit the model with the highest training accuracy to the **testing** data. Report the accuracy of the model on the **testing** data.
+```{r}
+log_reg_test_acc <- augment(log_fit, new_data = ttnc_test) %>%
+  accuracy(truth = factor(survived), estimate = .pred_class)
+log_reg_test_acc
+```
 
-Again using the **testing** data, create a confusion matrix and visualize it. Plot an ROC curve and calculate the area under it (AUC).
+The log reg model's accuracy on the training data is 75.52%
 
-How did the model perform? Compare its training and testing accuracies. If the values differ, why do you think this is so?
+```{r}
+augment(log_fit, new_data = ttnc_test) %>%
+  conf_mat(truth = survived, estimate = .pred_class) 
+
+augment(log_fit, new_data = ttnc_test) %>%
+  roc_curve(survived, .pred_No) %>%
+  autoplot()
+
+log_results <- augment(log_fit, new_data = ttnc_test)
+
+log_results %>% 
+  roc_auc(survived, .pred_No)
+```
+
+The model performed quite well. The training accuracy was 80.91%. The testing accuracy was slightly lower at 75.52%, but that is to be expected when fitting the testing data. This is because the model specializes on the training data that it learns from, so it will naturally perform better on the training data.
