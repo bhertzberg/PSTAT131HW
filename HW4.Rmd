@@ -1,0 +1,60 @@
+---
+title: "HW4"
+author: "Ben Hertzberg"
+date: "2022-11-03"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+titanic <- read.csv('./data/titanic.csv')
+library(tidymodels)
+library(tidyverse)
+library(ggplot2)
+library(discrim)
+library(poissonreg)
+library(corrr)
+library(klaR)
+tidymodels_prefer()
+```
+
+
+```{r}
+titanic$survived <- as.factor(titanic$survived)
+titanic$pclass <- as.factor(titanic$pclass)
+```
+
+
+### Question 1
+
+```{r}
+set.seed(619)
+
+ttnc_split <- initial_split(titanic, prop = 0.80, strata = survived)
+ttnc_train <- training(ttnc_split)
+ttnc_test <- testing(ttnc_split)
+
+```
+
+```{r}
+dim(ttnc_train)
+dim(ttnc_test)
+```
+712 training observations, 179 testing observations, which is about 80% training and 20% testing.
+
+```{r}
+ttnc_rec <- recipe(survived ~ pclass + sex + age + sib_sp + parch + fare, data = ttnc_train) %>%
+
+  step_impute_linear() %>%
+  step_dummy(all_nominal_predictors()) %>%  
+  step_normalize(all_numeric_predictors()) %>%
+  step_interact(terms = ~starts_with("sex"):fare) %>%
+  step_interact(terms = ~age:fare)
+```
+
+
+
+
