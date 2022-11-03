@@ -43,7 +43,7 @@ ttnc_test <- testing(ttnc_split)
 ```
 
 ```{r}
-ttnc_train
+head(ttnc_train)
 ```
 
 There is some data missing for the age and cabin variables. Some of the data for the ticket variable seems to be formatted incorrectly.
@@ -135,16 +135,16 @@ qda_fit <- fit(qda_wkflow, ttnc_train)
 ### Question 8
 
 ```{r}
-nb_mod <- naive_Bayes() %>%
-  set_mode("classification") %>%
-  set_engine("klaR") %>%
-  set_args(usekernel = FALSE)
-
-nb_wkflow <- workflow() %>%
-  add_model(nb_mod) %>%
-  add_recipe(ttnc_rec)
-
-nb_fit <- fit(nb_wkflow, ttnc_train)
+# nb_mod <- naive_Bayes() %>%
+#   set_mode("classification") %>%
+#   set_engine("klaR") %>%
+#   set_args(usekernel = FALSE)
+# 
+# nb_wkflow <- workflow() %>%
+#   add_model(nb_mod) %>%
+#   add_recipe(ttnc_rec)
+# 
+# nb_fit <- fit(nb_wkflow, ttnc_train)
 
 
 #Received error during fit:
