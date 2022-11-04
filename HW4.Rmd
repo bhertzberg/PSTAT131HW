@@ -67,6 +67,8 @@ ttnc_folds
 
 In your own words, explain what we are doing in Question 2. What is *k*-fold cross-validation? Why should we use it, rather than simply fitting and testing models on the entire training set? If we **did** use the entire training set, what resampling method would that be?
 
+In Q2, we randomly assigned observations from the training data into 10 roughly equal subsets to be used in k-fold cross-validation. K-fold CV offers a way to check how well our model is doing before applying it on the testing data. This is done by training a model on every fold except one, and then effectively testing on that last fold. K total models are trained, each one using a different fold to test on and training on all the others. This offers the benefit of checking how a model works on data it was not trained on before actually applying it to the test data. If we fit and train models on the entire training set right away, we have to use the testing data to do this check, and then we can't make adjustments to the model without risking data leakage.
+
 ### Question 4
 
 Set up workflows for 3 models:
@@ -74,6 +76,25 @@ Set up workflows for 3 models:
 1. A logistic regression with the `glm` engine;
 2. A linear discriminant analysis with the `MASS` engine;
 3. A quadratic discriminant analysis with the `MASS` engine.
+
+```{r}
+log_reg <- logistic_reg() %>% 
+  set_engine('glm') %>% 
+  set_mode('classification')
+
+log_wkflow <- workflow() %>% 
+  add_model(log_reg) %>% 
+  add_recipe(ttnc_rec)
+
+lda_mod <- discrim_linear() %>% 
+  set_engine('MASS') %>% 
+  set_mode('classification')
+
+lda_wkflow <- workflow() %>% 
+  add_model(lda_mod) %>% 
+  add_recipe(ttnc_rec)
+```
+
 
 How many models, total, across all folds, will you be fitting to the data? To answer, think about how many folds there are, and how many models you'll fit to each fold.
 
