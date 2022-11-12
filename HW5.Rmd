@@ -9,6 +9,14 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+library(janitor)
+library(ggplot2)
+library(tidymodels)
+library(tidyverse)
+```
+
+
 ### Exercise 1
 
 ```{r}
@@ -24,13 +32,19 @@ The variable names in the data set were all standardized. This function is usefu
 
 ### Exercise 2
 
-Using the entire data set, create a bar chart of the outcome variable, `type_1`.
+```{r}
+type_1_plot<-ggplot(pok, aes(type_1)) + 
+  geom_bar()
+type_1_plot
+```
 
-How many classes of the outcome are there? Are there any Pokémon types with very few Pokémon? If so, which ones?
+```{r}
+pok2 <- subset(pok, type_1 ==c('Bug','Fire','Grass',"Normal",'Water','Psychic'))
+pok2$type_1 <- as.factor(pok2$type_1)
+pok2$legendary <- as.factor(pok2$legendary)
+```
 
-For this assignment, we'll handle the rarer classes by simply filtering them out. Filter the entire data set to contain only Pokémon whose `type_1` is Bug, Fire, Grass, Normal, Water, or Psychic.
-
-After filtering, convert `type_1` and `legendary` to factors.
+There are 18 classes of the type_1 variable. There are very few Flying and Fairy types
 
 ### Exercise 3
 
