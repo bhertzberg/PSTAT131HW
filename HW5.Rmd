@@ -76,6 +76,13 @@ Set up a recipe to predict `type_1` with `legendary`, `generation`, `sp_atk`, `a
 
 - Center and scale all predictors.
 
+```{r}
+pok_rec <- recipe(type_1 ~ legendary + generation + sp_atk + attack + speed + defense + hp + sp_def, data = pok_train) %>% 
+  
+  step_dummy(legendary, generation) %>% 
+  step_normalize(all_numeric_predictors())
+```
+
 ### Exercise 5
 
 We'll be fitting and tuning an elastic net, tuning `penalty` and `mixture` (use `multinom_reg` with the `glmnet` engine).
