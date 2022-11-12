@@ -52,6 +52,22 @@ Perform an initial split of the data. Stratify by the outcome variable. You can 
 
 Next, use *v*-fold cross-validation on the training set. Use 5 folds. Stratify the folds by `type_1` as well. *Hint: Look for a `strata` argument.* Why might stratifying the folds be useful?
 
+```{r}
+set.seed(619)
+
+pok_split <- initial_split(pok2, prop = 0.80, strata = type_1)
+pok_train <- training(pok_split)
+pok_test <- testing(pok_split)
+dim(pok_train)
+dim(pok_test)
+```
+
+```{r}
+pok_folds <- vfold_cv(pok_train, v = 5, strata = type_1)
+pok_folds
+```
+
+
 ### Exercise 4
 
 Set up a recipe to predict `type_1` with `legendary`, `generation`, `sp_atk`, `attack`, `speed`, `defense`, `hp`, and `sp_def`.
