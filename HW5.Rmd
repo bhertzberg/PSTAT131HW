@@ -14,6 +14,7 @@ library(janitor)
 library(ggplot2)
 library(tidymodels)
 library(tidyverse)
+library(glmnet)
 ```
 
 
@@ -90,3 +91,51 @@ We'll be fitting and tuning an elastic net, tuning `penalty` and `mixture` (use 
 Set up this model and workflow. Create a regular grid for `penalty` and `mixture` with 10 levels each; `mixture` should range from 0 to 1. For this assignment, we'll let `penalty` range from -5 to 5 (it's log-scaled).
 
 How many total models will you be fitting when you fit these models to your folded data?
+```{r}
+net_mod <- 
+  multinom_reg(penalty = tune(), mixture = tune()) %>% 
+  set_mode('classification') %>% 
+  set_engine('glmnet')
+
+net_wkflw <- workflow() %>% 
+  add_recipe(pok_rec) %>% 
+  add_model(net_mod)
+```
+
+
+```{r}
+penalty_grid <- grid_regular(penalty(range = c(-5, 5)), levels = 10)
+mixture_grid <- grid_regular(mixture(range = c(0,1)), levels = 10)
+tot_grid <- expand.grid(penalty_grid, mixture_grid)
+tot_grid
+```
+
+
+I will be fitting 100 models to each of 10 folds, for a total of 1000 model
+
+### Exercise 6
+
+Fit the models to your folded data using `tune_grid()`.
+
+Use `autoplot()` on the results. What do you notice? Do larger or smaller values of `penalty` and `mixture` produce better accuracy and ROC AUC?
+
+```{r}
+tune_res <-tune_grid(
+  net_wkflw,
+  resamples = pok_folds,
+  grid = expand.grid(penalty_grid, mixture_grid)
+)
+```
+
+
+### Exercise 7
+
+Use `select_best()` to choose the model that has the optimal `roc_auc`. Then use `finalize_workflow()`, `fit()`, and `augment()` to fit the model to the training set and evaluate its performance on the testing set.
+
+### Exercise 8
+
+Calculate the overall ROC AUC on the testing set.
+
+Then create plots of the different ROC curves, one per level of the outcome. Also make a heat map of the confusion matrix.
+
+What do you notice? How did your model do? Which Pokemon types is the model best at predicting, and which is it worst at? Do you have any ideas why this might be?
