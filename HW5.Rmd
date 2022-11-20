@@ -143,29 +143,21 @@ augment(pok_final_fit, new_data = pok_test) %>%
 
 ### Exercise 8
 
-Calculate the overall ROC AUC on the testing set.
-
-Then create plots of the different ROC curves, one per level of the outcome. Also make a heat map of the confusion matrix.
-
-What do you notice? How did your model do? Which Pokemon types is the model best at predicting, and which is it worst at? Do you have any ideas why this might be?
-
 ```{r}
 predicted_data <- predict(pok_final_fit, new_data = pok_test, type = 'prob')
 ```
 
 ```{r}
-mod_roc_auc <- augment(pok_final_fit, new_data = pok_test) %>% 
- roc_a(truth = type_1, estimate = .pred_class)
-```
+augment(pok_final_fit, new_data = pok_test) %>% 
+  roc_auc(type_1, .pred_Bug:.pred_Water)
 
-
-```{r}
-  roc_auc(type_1, .pred_Bug:.pred_Water) %>% 
-  roc_curve(pok_train)
+augment(pok_final_fit, new_data = pok_test) %>%
+  roc_curve(type_1, .pred_Bug:.pred_Water) %>%
+  autoplot()
 
 augment(pok_final_fit, new_data = pok_test) %>%
   conf_mat(truth = type_1, estimate = .pred_class) %>% 
-  autoplot(type = 'heatmap')
-
+  autoplot(type = 'heatmap') 
 ```
 
+The overall ROC AUC is 0.636, which is not much better than a completely random model which would produce 0.5. However, the model did much better than this for specific pokemon types based on the ROC curves. The model is best at predicting grass, bug, and psychic types, and is worst at predicting water, fire, and normal types. This might be because bug, grass, and psychic would have more unique features that distinguish them into these unconventional types. Fire, normal, and water seem like more general terms, and could have fewer distinguishing features as a result.
