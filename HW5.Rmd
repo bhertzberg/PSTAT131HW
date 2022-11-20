@@ -2,14 +2,14 @@
 title: "HW5"
 author: "Ben Hertzberg"
 date: "2022-11-12"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r, message=FALSE}
 library(janitor)
 library(ggplot2)
 library(tidymodels)
