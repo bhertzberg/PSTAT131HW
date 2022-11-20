@@ -49,9 +49,6 @@ There are 18 classes of the type_1 variable. There are very few Flying and Fairy
 
 ### Exercise 3
 
-Perform an initial split of the data. Stratify by the outcome variable. You can choose a proportion to use. Verify that your training and test sets have the desired number of observations.
-
-Next, use *v*-fold cross-validation on the training set. Use 5 folds. Stratify the folds by `type_1` as well. *Hint: Look for a `strata` argument.* Why might stratifying the folds be useful?
 
 ```{r}
 set.seed(619)
@@ -68,14 +65,10 @@ pok_folds <- vfold_cv(pok_train, v = 5, strata = type_1)
 pok_folds
 ```
 
+Stratifying the folds would be useful becuause some predictor possibilities occur rarely, and ina randomly selected sample without stratification, some of these possibilities might get passed over entirely and fail to assist in training.
 
 ### Exercise 4
 
-Set up a recipe to predict `type_1` with `legendary`, `generation`, `sp_atk`, `attack`, `speed`, `defense`, `hp`, and `sp_def`.
-
-- Dummy-code `legendary` and `generation`;
-
-- Center and scale all predictors.
 
 ```{r}
 pok_rec <- recipe(type_1 ~ legendary + generation + sp_atk + attack + speed + defense + hp + sp_def, data = pok_train) %>% 
@@ -86,11 +79,6 @@ pok_rec <- recipe(type_1 ~ legendary + generation + sp_atk + attack + speed + de
 
 ### Exercise 5
 
-We'll be fitting and tuning an elastic net, tuning `penalty` and `mixture` (use `multinom_reg` with the `glmnet` engine).
-
-Set up this model and workflow. Create a regular grid for `penalty` and `mixture` with 10 levels each; `mixture` should range from 0 to 1. For this assignment, we'll let `penalty` range from -5 to 5 (it's log-scaled).
-
-How many total models will you be fitting when you fit these models to your folded data?
 ```{r}
 net_mod <- 
   multinom_reg(penalty = tune(), mixture = tune()) %>% 
@@ -113,10 +101,6 @@ net_grid
 I will be fitting 100 models to each of 5 folds, for a total of 500 model
 
 ### Exercise 6
-
-Fit the models to your folded data using `tune_grid()`.
-
-Use `autoplot()` on the results. What do you notice? Do larger or smaller values of `penalty` and `mixture` produce better accuracy and ROC AUC?
 
 ```{r, eval = FALSE}
 tune_res <-tune_grid(
@@ -144,6 +128,19 @@ Medium to smaller values of penalty, and smaller values of mixture, produced bet
 
 Use `select_best()` to choose the model that has the optimal `roc_auc`. Then use `finalize_workflow()`, `fit()`, and `augment()` to fit the model to the training set and evaluate its performance on the testing set.
 
+```{r}
+best_mod <- select_best(pok_tune_res, metric = 'roc_auc')
+pok_final <- finalize_workflow(net_wkflw, best_mod)
+pok_final_fit <- fit(pok_final, data = pok_train)
+```
+
+```{r}
+augment(pok_final_fit, new_data = pok_test) %>%
+  conf_mat(truth = type_1, estimate = .pred_class) 
+```
+
+
+
 ### Exercise 8
 
 Calculate the overall ROC AUC on the testing set.
@@ -151,3 +148,24 @@ Calculate the overall ROC AUC on the testing set.
 Then create plots of the different ROC curves, one per level of the outcome. Also make a heat map of the confusion matrix.
 
 What do you notice? How did your model do? Which Pokemon types is the model best at predicting, and which is it worst at? Do you have any ideas why this might be?
+
+```{r}
+predicted_data <- predict(pok_final_fit, new_data = pok_test, type = 'prob')
+```
+
+```{r}
+mod_roc_auc <- augment(pok_final_fit, new_data = pok_test) %>% 
+ roc_a(truth = type_1, estimate = .pred_class)
+```
+
+
+```{r}
+  roc_auc(type_1, .pred_Bug:.pred_Water) %>% 
+  roc_curve(pok_train)
+
+augment(pok_final_fit, new_data = pok_test) %>%
+  conf_mat(truth = type_1, estimate = .pred_class) %>% 
+  autoplot(type = 'heatmap')
+
+```
+
