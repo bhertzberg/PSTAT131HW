@@ -11,12 +11,14 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r, message=FALSE}
-library(janitor)
-library(ggplot2)
-library(tidymodels)
 library(tidyverse)
-library(glmnet)
+library(tidymodels)
 library(corrplot)
+library(rpart.plot)
+library(vip)
+library(janitor)
+library(randomForest)
+library(xgboost)
 ```
 
 ### Exercise 1
@@ -68,6 +70,32 @@ The variable 'total' has a strong positive correlation with every variable excep
 ### Exercise 3
 
 First, set up a decision tree model and workflow. Tune the `cost_complexity` hyperparameter. Use the same levels we used in Lab 7 -- that is, `range = c(-3, -1)`. Specify that the metric we want to optimize is `roc_auc`. 
+
+```{r}
+tree_spec <- decision_tree() %>% 
+  set_engine('rpart')
+
+class_tree_spec <- tree_spec %>% 
+  set_mode('classification')
+
+class_tree_wf <- workflow() %>% 
+  add_model(class_tree_spec %>% set_args(cost_complexity = tune())) %>% 
+  add_formula(type_1~.)
+```
+
+```{r}
+param_grid <- grid_regular(cost_complexity(range = c(-3, -1)), levels = 10)
+
+tune_res <- tune_grid(
+  class_tree_wf,
+  resamples = pok_folds,
+  grid = param_grid,
+  metrics = metric_set(roc_auc)
+)
+                           
+```
+
+
 
 Print an `autoplot()` of the results. What do you observe? Does a single decision tree perform better with a smaller or larger complexity penalty?
 
