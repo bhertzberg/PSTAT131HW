@@ -80,7 +80,7 @@ class_tree_spec <- tree_spec %>%
 
 class_tree_wf <- workflow() %>% 
   add_model(class_tree_spec %>% set_args(cost_complexity = tune())) %>% 
-  add_formula(type_1~.)
+  add_recipe(pok_rec)
 ```
 
 ```{r}
@@ -95,17 +95,34 @@ tune_res <- tune_grid(
                            
 ```
 
+```{r}
+autoplot(tune_res)
+```
 
-
-Print an `autoplot()` of the results. What do you observe? Does a single decision tree perform better with a smaller or larger complexity penalty?
+The results for roc_auc are nearly constant until the cost complexity reached about 0.06, where the roc_auc slightly increased. As cost complexity increased beyond that value, roc_auc significantly decreased. In general, it seems like the single decision tree performed better with a smaller cost complexity penalty.
 
 ### Exercise 4
 
-What is the `roc_auc` of your best-performing pruned decision tree on the folds? *Hint: Use `collect_metrics()` and `arrange()`.*
+```{r}
+collect_metrics(tune_res) %>% 
+  arrange(desc(mean))
+
+best_mod <- select_best(tune_res, metric = 'roc_auc')
+```
+
+The `roc_auc` of my best-performing pruned decision tree on the folds is 0.560
 
 ### Exercise 5
 
 Using `rpart.plot`, fit and visualize your best-performing pruned decision tree with the *training* set.
+
+```{r}
+pok_final <- finalize_workflow(class_tree_wf, best_mod)
+pok_final_fit <- fit(pok_final, data = pok_train)
+pok_final_fit %>% 
+  extract_fit_engine() %>% 
+  rpart.plot()
+```
 
 ### Exercise 5
 
