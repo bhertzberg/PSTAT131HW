@@ -92,11 +92,15 @@ tune_res <- tune_grid(
   grid = param_grid,
   metrics = metric_set(roc_auc)
 )
+
+write_rds(tune_res, file = 'SavedModels/poketree_tuned_res.rds')
                            
 ```
 
 ```{r}
-autoplot(tune_res)
+poketree_tune_res <- read_rds(file = 'SavedModels/poketree_tuned_res.rds')
+
+autoplot(poketree_tune_res)
 ```
 
 The results for roc_auc are nearly constant until the cost complexity reached about 0.06, where the roc_auc slightly increased. As cost complexity increased beyond that value, roc_auc significantly decreased. In general, it seems like the single decision tree performed better with a smaller cost complexity penalty.
@@ -104,10 +108,10 @@ The results for roc_auc are nearly constant until the cost complexity reached ab
 ### Exercise 4
 
 ```{r}
-collect_metrics(tune_res) %>% 
+collect_metrics(poketree_tune_res) %>% 
   arrange(desc(mean))
 
-best_mod <- select_best(tune_res, metric = 'roc_auc')
+best_mod <- select_best(poketree_tune_res, metric = 'roc_auc')
 ```
 
 The `roc_auc` of my best-performing pruned decision tree on the folds is 0.560
@@ -127,12 +131,42 @@ pok_final_fit %>%
 ### Exercise 5
 
 Now set up a random forest model and workflow. Use the `ranger` engine and set `importance = "impurity"`. Tune `mtry`, `trees`, and `min_n`. Using the documentation for `rand_forest()`, explain in your own words what each of these hyperparameters represent.
+```{r}
+bagging_spec <- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %>% 
+  set_engine('ranger', importance = 'impurity') %>% 
+  set_mode('classification')
+
+
+rf_wf <- workflow() %>% 
+  add_model(bagging_spec) %>% 
+  add_recipe(pok_rec)
+```
+
+mtry specifies how many randomly chosen variables are available to the model at each split, which guarantees that not all trees make the same splits. trees is a value that specifies the number of trees the entire ensemble can contain. min_n specifies a minimum number of data points in a node to allow another split to be made.
+
 
 Create a regular grid with 8 levels each. You can choose plausible ranges for each hyperparameter. Note that `mtry` should not be smaller than 1 or larger than 8. **Explain why not. What type of model would `mtry = 8` represent?**
+
+```{r}
+reg_grid <- grid_regular(mtry(range = c(1,8)), trees(range = c(10, 300)), min_n(range = c(2,12)), levels = 8)
+```
+
+You can't choose a mtry value less than 1 because then the model would have no variables to choose from to make a split, so no splits would be made. In thise case, you can't have a mtry value more than 8, because there are only 8 predictor variables, so you can't provide the model with more options to make a split on. A mtry value of 8 is bagging.
 
 ### Exercise 6
 
 Specify `roc_auc` as a metric. Tune the model and print an `autoplot()` of the results. What do you observe? What values of the hyperparameters seem to yield the best performance?
+
+```{r}
+tune_res2 <- tune_grid(
+  rf_wf,
+  resamples = pok_folds,
+  grid = reg_grid
+)
+
+write_rds(tune_res2, file = 'SavedModels/poke_rf_tuned_res.rds')
+```
+
 
 ### Exercise 7
 
