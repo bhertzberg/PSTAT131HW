@@ -83,7 +83,7 @@ class_tree_wf <- workflow() %>%
   add_recipe(pok_rec)
 ```
 
-```{r}
+```{r, eval = FALSE}
 param_grid <- grid_regular(cost_complexity(range = c(-3, -1)), levels = 10)
 
 tune_res <- tune_grid(
@@ -157,7 +157,7 @@ You can't choose a mtry value less than 1 because then the model would have no v
 
 Specify `roc_auc` as a metric. Tune the model and print an `autoplot()` of the results. What do you observe? What values of the hyperparameters seem to yield the best performance?
 
-```{r}
+```{r, eval=FALSE}
 tune_res2 <- tune_grid(
   rf_wf,
   resamples = pok_folds,
@@ -167,20 +167,65 @@ tune_res2 <- tune_grid(
 write_rds(tune_res2, file = 'SavedModels/poke_rf_tuned_res.rds')
 ```
 
+```{r}
+poke_rf_res <- read_rds(file = 'SavedModels/poke_rf_tuned_res.rds')
+
+autoplot(poke_rf_res)
+```
 
 ### Exercise 7
 
 What is the `roc_auc` of your best-performing random forest model on the folds? *Hint: Use `collect_metrics()` and `arrange()`.*
 
+```{r}
+collect_metrics(poke_rf_res) %>% 
+  arrange(desc(mean))
+
+best_rf_mod <- select_best(poke_rf_res, metric = 'roc_auc')
+```
+
 ### Exercise 8
 
 Create a variable importance plot, using `vip()`, with your best-performing random forest model fit on the *training* set.
+```{r}
+pok_rf_final <- finalize_workflow(rf_wf, best_rf_mod)
+rf_fit <- fit(pok_rf_final, data = pok_train)
+rf_fit
+```
+
+```{r}
+vip(rf_fit)
+```
+
 
 Which variables were most useful? Which were least useful? Are these results what you expected, or not?
 
 ### Exercise 9
 
 Finally, set up a boosted tree model and workflow. Use the `xgboost` engine. Tune `trees`. Create a regular grid with 10 levels; let `trees` range from 10 to 2000. Specify `roc_auc` and again print an `autoplot()` of the results. 
+
+```{r}
+boost_spec <- boost_tree(trees = tune()) %>%
+  set_engine("xgboost") %>%
+  set_mode("classification")
+
+boost_wf <- workflow() %>% 
+  add_model(boost_spec) %>% 
+  add_recipe(pok_rec)
+```
+
+```{r}
+boost_grid <- grid_regular(trees(range = c(10, 2000)), levels = 10)
+
+tune_res <- tune_grid(
+  boost_wf,
+  resamples = pok_folds,
+  grid = boost_grid,
+  metrics = metric_set(roc_auc)
+)
+
+write_rds(tune_res, file = 'SavedModels/poketree_tuned_res.rds')
+```
 
 What do you observe?
 
