@@ -97,6 +97,7 @@ write_rds(tune_res, file = 'SavedModels/poketree_tuned_res.rds')
                            
 ```
 
+
 ```{r}
 poketree_tune_res <- read_rds(file = 'SavedModels/poketree_tuned_res.rds')
 
@@ -155,7 +156,6 @@ You can't choose a mtry value less than 1 because then the model would have no v
 
 ### Exercise 6
 
-Specify `roc_auc` as a metric. Tune the model and print an `autoplot()` of the results. What do you observe? What values of the hyperparameters seem to yield the best performance?
 
 ```{r, eval=FALSE}
 tune_res2 <- tune_grid(
@@ -172,10 +172,11 @@ poke_rf_res <- read_rds(file = 'SavedModels/poke_rf_tuned_res.rds')
 
 autoplot(poke_rf_res)
 ```
+Models with fewer trees (less than 100) seemed to have a lot more variability. For every model, the number of randomly selected predictors seemed to have the largest effect on roc_auc.
+
+Models with 2 to 4 randomly selected predictors performed the best. Of these, models with less than 100 trees had the highest peaks in roc_auc, but have far more variability than those with more trees.
 
 ### Exercise 7
-
-What is the `roc_auc` of your best-performing random forest model on the folds? *Hint: Use `collect_metrics()` and `arrange()`.*
 
 ```{r}
 collect_metrics(poke_rf_res) %>% 
@@ -183,6 +184,8 @@ collect_metrics(poke_rf_res) %>%
 
 best_rf_mod <- select_best(poke_rf_res, metric = 'roc_auc')
 ```
+
+The `roc_auc` of the best-performing random forest model is 0.6259
 
 ### Exercise 8
 
@@ -224,10 +227,17 @@ tune_res <- tune_grid(
   metrics = metric_set(roc_auc)
 )
 
-write_rds(tune_res, file = 'SavedModels/poketree_tuned_res.rds')
+write_rds(tune_res, file = 'SavedModels/poketree_boost_res.rds')
 ```
 
-What do you observe?
+```{r}
+
+poke_boost_res <- read_rds(file = 'SavedModels/poketree_boost_res.rds')
+
+autoplot(poke_boost_res)
+```
+
+The roc_auc peaks around 500 trees at 0.5925. Increasing or deacreasing the trees leads to a large drop in roc_auc.
 
 What is the `roc_auc` of your best-performing boosted tree model on the folds? *Hint: Use `collect_metrics()` and `arrange()`.*
 
