@@ -69,8 +69,6 @@ The variable 'total' has a strong positive correlation with every variable excep
 
 ### Exercise 3
 
-First, set up a decision tree model and workflow. Tune the `cost_complexity` hyperparameter. Use the same levels we used in Lab 7 -- that is, `range = c(-3, -1)`. Specify that the metric we want to optimize is `roc_auc`. 
-
 ```{r}
 tree_spec <- decision_tree() %>% 
   set_engine('rpart')
@@ -118,8 +116,6 @@ The `roc_auc` of my best-performing pruned decision tree on the folds is 0.560
 
 ### Exercise 5
 
-Using `rpart.plot`, fit and visualize your best-performing pruned decision tree with the *training* set.
-
 ```{r}
 pok_final <- finalize_workflow(class_tree_wf, best_mod)
 pok_final_fit <- fit(pok_final, data = pok_train)
@@ -130,7 +126,6 @@ pok_final_fit %>%
 
 ### Exercise 5
 
-Now set up a random forest model and workflow. Use the `ranger` engine and set `importance = "impurity"`. Tune `mtry`, `trees`, and `min_n`. Using the documentation for `rand_forest()`, explain in your own words what each of these hyperparameters represent.
 ```{r}
 bagging_spec <- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %>% 
   set_engine('ranger', importance = 'impurity') %>% 
@@ -144,8 +139,6 @@ rf_wf <- workflow() %>%
 
 mtry specifies how many randomly chosen variables are available to the model at each split, which guarantees that not all trees make the same splits. trees is a value that specifies the number of trees the entire ensemble can contain. min_n specifies a minimum number of data points in a node to allow another split to be made.
 
-
-Create a regular grid with 8 levels each. You can choose plausible ranges for each hyperparameter. Note that `mtry` should not be smaller than 1 or larger than 8. **Explain why not. What type of model would `mtry = 8` represent?**
 
 ```{r}
 reg_grid <- grid_regular(mtry(range = c(1,8)), trees(range = c(10, 300)), min_n(range = c(2,12)), levels = 8)
@@ -187,23 +180,23 @@ The `roc_auc` of the best-performing random forest model is 0.6259
 
 ### Exercise 8
 
-Create a variable importance plot, using `vip()`, with your best-performing random forest model fit on the *training* set.
 ```{r}
 pok_rf_final <- finalize_workflow(rf_wf, best_rf_mod)
 rf_fit <- fit(pok_rf_final, data = pok_train)
 rf_fit
 ```
 
-```{r}
+```{r, eval = FALSE}
 vip(rf_fit)
 ```
 
 
 Which variables were most useful? Which were least useful? Are these results what you expected, or not?
 
+I can't get vip() to work. I receive the following message: 'Error: Model-specific variable importance scores are currently not available for this type of model.' I have looked into documentation and online forums with no luck. I saw that in the lab, vip runs when the workflow uses the 'randomForest' engine, and in this problem we are told to use 'ranger'. I wanted to explore this further, but doing so would require retuning the random forest model, and I did not have the patience for that (it takes about an hour on my laptop).
+
 ### Exercise 9
 
-Finally, set up a boosted tree model and workflow. Use the `xgboost` engine. Tune `trees`. Create a regular grid with 10 levels; let `trees` range from 10 to 2000. Specify `roc_auc` and again print an `autoplot()` of the results. 
 
 ```{r}
 boost_spec <- boost_tree(trees = tune()) %>%
@@ -249,8 +242,6 @@ The `roc_auc` of the best-performing boosted tree model is 0.5922
 
 ### Exercise 10
 
-Display a table of the three ROC AUC values for your best-performing pruned tree, random forest, and boosted tree models. Which performed best on the folds? Select the best of the three and use `select_best()`, `finalize_workflow()`, and `fit()` to fit it to the *testing* set. 
-
 ```{r}
 best_mod$mean
 best_rf_mod$mean
@@ -262,12 +253,10 @@ The random forest model performed the best on the folds.
 final_mod <- best_rf_mod
 
 pok_final <- finalize_workflow(rf_wf, final_mod)
-test_fit <- fit(pok_final, data = pok_train)
+test_fit <- fit(pok_final, data = pok_test)
 test_fit
 ```
 
-
-Print the AUC value of your best-performing model on the testing set. Print the ROC curves. Finally, create and visualize a confusion matrix heat map.
 
 ```{r}
 augment(test_fit, new_data = pok_test) %>% 
@@ -282,5 +271,4 @@ augment(test_fit, new_data = pok_test) %>%
   autoplot(type = 'heatmap')
 ```
 
-
-The model was most accurate at predicting bug and grass types. It was worst at predicting normal and water types.
+I am getting an roc_auc of 1, which suggests perfect prediction. This might be an error, but I also noticed that in this homework, unlike other weeks, we fit the final model to the test data, and then checked performance using the same test data. It makes sense that the model would be perfect in making predictions for a data set that it was trained on. However, the heatmap actually reveals that the model incorrectly labeled two bug types - one it labeled grass, another normal. This could arise from overlap of predictor variable values in the test set, which could confuse the model.
