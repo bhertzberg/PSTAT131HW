@@ -109,10 +109,9 @@ The results for roc_auc are nearly constant until the cost complexity reached ab
 ### Exercise 4
 
 ```{r}
-collect_metrics(poketree_tune_res) %>% 
-  arrange(desc(mean))
-
-best_mod <- select_best(poketree_tune_res, metric = 'roc_auc')
+best_mod <- collect_metrics(poketree_tune_res) %>% 
+  arrange(desc(mean))%>% 
+  dplyr::slice(1)
 ```
 
 The `roc_auc` of my best-performing pruned decision tree on the folds is 0.560
@@ -179,10 +178,9 @@ Models with 2 to 4 randomly selected predictors performed the best. Of these, mo
 ### Exercise 7
 
 ```{r}
-collect_metrics(poke_rf_res) %>% 
-  arrange(desc(mean))
-
-best_rf_mod <- select_best(poke_rf_res, metric = 'roc_auc')
+best_rf_mod <- collect_metrics(poke_rf_res) %>% 
+  arrange(desc(mean))%>% 
+  dplyr::slice(1)
 ```
 
 The `roc_auc` of the best-performing random forest model is 0.6259
@@ -217,7 +215,7 @@ boost_wf <- workflow() %>%
   add_recipe(pok_rec)
 ```
 
-```{r}
+```{r, eval = FALSE}
 boost_grid <- grid_regular(trees(range = c(10, 2000)), levels = 10)
 
 tune_res <- tune_grid(
@@ -239,18 +237,50 @@ autoplot(poke_boost_res)
 
 The roc_auc peaks around 500 trees at 0.5925. Increasing or deacreasing the trees leads to a large drop in roc_auc.
 
-What is the `roc_auc` of your best-performing boosted tree model on the folds? *Hint: Use `collect_metrics()` and `arrange()`.*
+
+```{r}
+best_boost_mod <- collect_metrics(poke_boost_res) %>% 
+  arrange(desc(mean)) %>% 
+  dplyr::slice(1)
+```
+
+
+The `roc_auc` of the best-performing boosted tree model is 0.5922
 
 ### Exercise 10
 
 Display a table of the three ROC AUC values for your best-performing pruned tree, random forest, and boosted tree models. Which performed best on the folds? Select the best of the three and use `select_best()`, `finalize_workflow()`, and `fit()` to fit it to the *testing* set. 
 
+```{r}
+best_mod$mean
+best_rf_mod$mean
+best_boost_mod$mean
+```
+The random forest model performed the best on the folds.
+
+```{r}
+final_mod <- best_rf_mod
+
+pok_final <- finalize_workflow(rf_wf, final_mod)
+test_fit <- fit(pok_final, data = pok_train)
+test_fit
+```
+
+
 Print the AUC value of your best-performing model on the testing set. Print the ROC curves. Finally, create and visualize a confusion matrix heat map.
 
-Which classes was your model most accurate at predicting? Which was it worst at?
+```{r}
+augment(test_fit, new_data = pok_test) %>% 
+  roc_auc(type_1, .pred_Bug:.pred_Water)
 
-## For 231 Students
+augment(test_fit, new_data = pok_test) %>% 
+  roc_curve(type_1, .pred_Bug:.pred_Water) %>% 
+  autoplot()
 
-### Exercise 11
+augment(test_fit, new_data = pok_test) %>% 
+  conf_mat(truth = type_1, estimate = .pred_class) %>% 
+  autoplot(type = 'heatmap')
+```
 
-Using the `abalone.txt` data from previous assignments, fit and tune a random forest model to predict `age`. Use stratified cross-validation and select ranges for `mtry`, `min_n`, and `trees`. Present your results. What was the model's RMSE on your testing set?
+
+The model was most accurate at predicting bug and grass types. It was worst at predicting normal and water types.
