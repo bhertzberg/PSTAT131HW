@@ -116,13 +116,16 @@ The `roc_auc` of my best-performing pruned decision tree on the folds is 0.560
 
 ### Exercise 5
 
-```{r}
+```{r, eval=FALSE}
 pok_final <- finalize_workflow(class_tree_wf, best_mod)
 pok_final_fit <- fit(pok_final, data = pok_train)
 pok_final_fit %>% 
   extract_fit_engine() %>% 
   rpart.plot()
 ```
+
+The rplot above works perfect in my rmd file, but fails to knit.
+
 
 ### Exercise 5
 
