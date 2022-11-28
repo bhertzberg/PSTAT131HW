@@ -1,0 +1,51 @@
+---
+title: "FinalProject"
+author: "Ben Hertzberg"
+date: "2022-11-28"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, message=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(corrplot)
+library(rpart.plot)
+library(vip)
+library(janitor)
+library(randomForest)
+library(xgboost)
+```
+
+```{r}
+pok <- read.csv('./data/Pokemon.csv')
+pok <- clean_names(pok)
+pok2 <- subset(pok, type_1 == c('Bug','Fire','Grass',"Normal",'Water','Psychic'))
+pok2$type_1 <- as.factor(pok2$type_1)
+pok2$legendary <- as.factor(pok2$legendary)
+```
+
+```{r}
+used_cars <- read.csv('./UsedCars/us-dealers-used.csv')
+used_cars <- clean_names(used_cars)
+```
+Import data set. Must subset before doing anything with the data, including fitering ot missing values, because it is too big. Receieved error: 'Error: cannot allocate vector of size 569.1 Mb'
+```{r}
+set.seed(619)
+uc_subset<- sample_n(used_cars, size = 100000)
+```
+
+```{r}
+uc_subset[uc_subset ==""]<- NA
+uc_subset2 <- na.omit(uc_subset)
+write_rds(uc_subset2, file = 'data/used_cars_cleaned.rds')
+```
+
+```{r}
+uc_clean <- read_rds(file = 'data/used_cars_cleaned.rds')
+```
+
