@@ -21,13 +21,6 @@ library(randomForest)
 library(xgboost)
 ```
 
-```{r}
-pok <- read.csv('./data/Pokemon.csv')
-pok <- clean_names(pok)
-pok2 <- subset(pok, type_1 == c('Bug','Fire','Grass',"Normal",'Water','Psychic'))
-pok2$type_1 <- as.factor(pok2$type_1)
-pok2$legendary <- as.factor(pok2$legendary)
-```
 
 ```{r, eval = FALSE}
 used_cars <- read.csv('./UsedCars/us-dealers-used.csv')
@@ -52,6 +45,19 @@ uc_clean <- subset(uc_clean, select = -c(id, vin, stock_no, seller_name, street,
 
 Right off the bat I remove variables I am not interested in
 
+```{r}
+uc_clean$make <- as.factor(uc_clean$make)
+uc_clean$model <- as.factor(uc_clean$model)
+uc_clean$trim <- as.factor(uc_clean$trim)
+uc_clean$body_type <- as.factor(uc_clean$body_type)
+uc_clean$vehicle_type <- as.factor(uc_clean$vehicle_type)
+uc_clean$drivetrain <- as.factor(uc_clean$drivetrain)
+uc_clean$transmission <- as.factor(uc_clean$transmission)
+uc_clean$fuel_type <- as.factor(uc_clean$fuel_type)
+uc_clean$engine_block <- as.factor(uc_clean$engine_block)
+uc_clean$state <- as.factor(uc_clean$state)
+
+```
 
 
 
