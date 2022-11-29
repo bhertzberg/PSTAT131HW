@@ -50,7 +50,6 @@ Right off the bat I remove variables I am not interested in
 ```{r}
 uc_clean$make <- as.factor(uc_clean$make)
 uc_clean$model <- as.factor(uc_clean$model)
-uc_clean$trim <- as.factor(uc_clean$trim)
 uc_clean$body_type <- as.factor(uc_clean$body_type)
 uc_clean$vehicle_type <- as.factor(uc_clean$vehicle_type)
 uc_clean$drivetrain <- as.factor(uc_clean$drivetrain)
@@ -59,49 +58,53 @@ uc_clean$fuel_type <- as.factor(uc_clean$fuel_type)
 uc_clean$engine_block <- as.factor(uc_clean$engine_block)
 uc_clean$state <- as.factor(uc_clean$state)
 uc_clean$price <- as.numeric(uc_clean$price)
+uc_clean$miles <- as.numeric(uc_clean$miles)
+uc_clean$year <- as.numeric(uc_clean$year)
 
 ```
 
 
-
-### Splitting
-I don't need to stratify split data because response variable is continuous.
 ```{r}
-uc_split <- initial_split(uc_clean, prop = 0.80)
-uc_train <- training(uc_split)
-uc_test <- testing(uc_split)
+uc_clean <- subset(uc_clean, select = -c(trim))
+uc_clean <- subset(uc_clean, select = -c(state))
+
 ```
 
 
 ### Graphs
 
 ```{r}
+model_plot<-ggplot(uc_clean, aes(y = model)) + 
+  geom_bar()
+model_plot
+```
+
+
+```{r}
+model_counts <- table(uc_clean$model)
+
+df2 <- subset(uc_clean, model %in% names(model_counts[model_counts > 300]))
+df2<-droplevels(df2)
+```
+
+```{r}
+type_1_plot<-ggplot(df2, aes(y = model)) + 
+  geom_bar()
+type_1_plot
+```
+
+
+### Splitting
+```{r}
+uc_split <- initial_split(df2, prop = 0.80, strata = model, pool = 0.0001)
+uc_train <- training(uc_split)
+uc_test <- testing(uc_split)
+```
+
+
+
+```{r}
 uc_train %>% 
-  ggplot(aes(x = price)) +
-  geom_histogram()
-```
-
-Some very large values are skewing the data.
-
-```{r}
-cheap <- subset(uc_clean, uc_clean$price<100000)
-```
-
-```{r}
-cheap_split <- initial_split(cheap, prop = 0.80)
-cheap_train <- training(cheap_split)
-cheap_test <- testing(cheap_split)
-```
-
-
-```{r}
-cheap_train %>% 
-  ggplot(aes(x = price)) +
-  geom_histogram()
-```
-
-```{r}
-cheap_train %>% 
   select(is.numeric) %>% 
   cor(use = "complete.obs") %>% 
   corrplot(type = "lower", diag = FALSE)
@@ -117,20 +120,20 @@ There is a slight positive correlation between engine size and miles, and a slig
 ### First Model 
 
 ```{r}
-car_rec <- recipe(price ~ . , data = cheap_train) %>% 
+car_rec <- recipe(model ~ . , data = uc_train) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_normalize(all_predictors())
 ```
 
 ```{r}
-log_reg <- logistic_reg() %>% 
-  set_engine("glm") %>% 
+lda_mod <- discrim_linear() %>% 
+  set_engine("MASS") %>% 
   set_mode("classification")
 
-log_wkflow <- workflow() %>% 
-  add_model(log_reg) %>% 
+lda_wkflow <- workflow() %>% 
+  add_model(lda_mod) %>% 
   add_recipe(car_rec)
 
-log_fit <- fit(log_wkflow, cheap_train)
+lda_fit <- fit(lda_wkflow, uc_train)
 ```
 
