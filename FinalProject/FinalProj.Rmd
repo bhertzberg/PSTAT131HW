@@ -29,17 +29,14 @@ pok2$type_1 <- as.factor(pok2$type_1)
 pok2$legendary <- as.factor(pok2$legendary)
 ```
 
-```{r}
+```{r, eval = FALSE}
 used_cars <- read.csv('./UsedCars/us-dealers-used.csv')
 used_cars <- clean_names(used_cars)
 ```
 Import data set. Must subset before doing anything with the data, including fitering ot missing values, because it is too big. Receieved error: 'Error: cannot allocate vector of size 569.1 Mb'
-```{r}
+```{r, eval = FALSE}
 set.seed(619)
-uc_subset<- sample_n(used_cars, size = 100000)
-```
-
-```{r}
+uc_subset<- sample_n(used_cars, size = 50000)
 uc_subset[uc_subset ==""]<- NA
 uc_subset2 <- na.omit(uc_subset)
 write_rds(uc_subset2, file = 'data/used_cars_cleaned.rds')
@@ -49,3 +46,60 @@ write_rds(uc_subset2, file = 'data/used_cars_cleaned.rds')
 uc_clean <- read_rds(file = 'data/used_cars_cleaned.rds')
 ```
 
+```{r}
+uc_clean <- subset(uc_clean, select = -c(id, vin, stock_no, seller_name, street, city, zip))
+```
+
+Right off the bat I remove variables I am not interested in
+
+
+
+
+### Splitting
+I don't need to stratify split data because response variable is continuous.
+```{r}
+uc_split <- initial_split(uc_clean, prop = 0.80)
+uc_train <- training(uc_split)
+uc_test <- testing(uc_split)
+```
+
+
+### Graphs
+
+```{r}
+uc_train %>% 
+  ggplot(aes(x = price)) +
+  geom_histogram()
+```
+
+Some very large values are skewing the data.
+
+```{r}
+cheap <- subset(uc_clean, uc_clean$price<100000)
+```
+
+```{r}
+cheap_split <- initial_split(cheap, prop = 0.80)
+cheap_train <- training(cheap_split)
+cheap_test <- testing(cheap_split)
+```
+
+
+```{r}
+cheap_train %>% 
+  ggplot(aes(x = price)) +
+  geom_histogram()
+```
+
+```{r}
+cheap_train %>% 
+  select(is.numeric) %>% 
+  cor(use = "complete.obs") %>% 
+  corrplot(type = "lower", diag = FALSE)
+```
+
+The correlation plot shows strong relationships between many of the continuous variables in this data set. Price has a strong negative correlation with miles, which makes sense - no car lasts forever, so people tend to prefer cars that have been driven less. There is a strong positive correlation between price and year, which means newer cars have a higher price. There is also a stong positive correlation between price and engine size; a car with a bigger engine will cost more. Car companies often tout the horsepower of a car, so assuming a larger engine means a more powerful vehicle, this relationship checks out too.
+
+There is a very strong negative correlation between year and miles. This means newer cars (with a larger value for year) tend to have fewer miles driven on them. Sounds right to me. 
+
+There is a slight positive correlation between engine size and miles, and a slight negative correlation between engine size and year. These relationships are harder to explain. The first relationship is a mystery to me. As far as the second one, my best guess would be that cars have gotten smaller and more fuel efficient in recent years, which might mean engine sizes have decreased.
