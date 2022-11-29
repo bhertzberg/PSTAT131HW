@@ -19,6 +19,8 @@ library(vip)
 library(janitor)
 library(randomForest)
 library(xgboost)
+library(discrim)
+
 ```
 
 
@@ -56,6 +58,7 @@ uc_clean$transmission <- as.factor(uc_clean$transmission)
 uc_clean$fuel_type <- as.factor(uc_clean$fuel_type)
 uc_clean$engine_block <- as.factor(uc_clean$engine_block)
 uc_clean$state <- as.factor(uc_clean$state)
+uc_clean$price <- as.numeric(uc_clean$price)
 
 ```
 
@@ -109,3 +112,25 @@ The correlation plot shows strong relationships between many of the continuous v
 There is a very strong negative correlation between year and miles. This means newer cars (with a larger value for year) tend to have fewer miles driven on them. Sounds right to me. 
 
 There is a slight positive correlation between engine size and miles, and a slight negative correlation between engine size and year. These relationships are harder to explain. The first relationship is a mystery to me. As far as the second one, my best guess would be that cars have gotten smaller and more fuel efficient in recent years, which might mean engine sizes have decreased.
+
+
+### First Model 
+
+```{r}
+car_rec <- recipe(price ~ . , data = cheap_train) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_normalize(all_predictors())
+```
+
+```{r}
+log_reg <- logistic_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("classification")
+
+log_wkflow <- workflow() %>% 
+  add_model(log_reg) %>% 
+  add_recipe(car_rec)
+
+log_fit <- fit(log_wkflow, cheap_train)
+```
+
