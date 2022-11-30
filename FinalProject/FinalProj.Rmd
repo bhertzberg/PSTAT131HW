@@ -17,8 +17,6 @@ library(corrplot)
 library(rpart.plot)
 library(vip)
 library(janitor)
-library(randomForest)
-library(xgboost)
 library(discrim)
 
 ```
@@ -48,6 +46,13 @@ uc_clean <- subset(uc_clean, select = -c(id, vin, stock_no, seller_name, street,
 
 Right off the bat I remove variables I am not interested in
 
+
+```{r}
+uc_clean <- subset(uc_clean, select = -c(trim))
+uc_clean <- subset(uc_clean, select = -c(state))
+
+```
+
 ```{r}
 uc_clean$make <- as.factor(uc_clean$make)
 uc_clean$model <- as.factor(uc_clean$model)
@@ -57,7 +62,6 @@ uc_clean$drivetrain <- as.factor(uc_clean$drivetrain)
 uc_clean$transmission <- as.factor(uc_clean$transmission)
 uc_clean$fuel_type <- as.factor(uc_clean$fuel_type)
 uc_clean$engine_block <- as.factor(uc_clean$engine_block)
-uc_clean$state <- as.factor(uc_clean$state)
 uc_clean$price <- as.numeric(uc_clean$price)
 uc_clean$miles <- as.numeric(uc_clean$miles)
 uc_clean$year <- as.numeric(uc_clean$year)
@@ -65,11 +69,6 @@ uc_clean$year <- as.numeric(uc_clean$year)
 ```
 
 
-```{r}
-uc_clean <- subset(uc_clean, select = -c(trim))
-uc_clean <- subset(uc_clean, select = -c(state))
-
-```
 
 
 ### Graphs
@@ -84,13 +83,13 @@ model_plot
 ```{r}
 model_counts <- table(uc_clean$model)
 
-df2 <- subset(uc_clean, model %in% names(model_counts[model_counts > 300]))
-df2<-droplevels(df2)
+common_models <- subset(uc_clean, model %in% names(model_counts[model_counts > 300]))
+common_models<-droplevels(common_models)
 
 ```
 
 ```{r}
-type_1_plot<-ggplot(df2, aes(y = model)) + 
+type_1_plot<-ggplot(common_models, aes(y = model)) + 
   geom_bar()
 type_1_plot
 ```
@@ -99,7 +98,7 @@ type_1_plot
 ### Splitting
 ```{r}
 set.seed(619)
-uc_split <- initial_split(df2, prop = 0.80, strata = model, pool = 0.01)
+uc_split <- initial_split(common_models, prop = 0.80, strata = model, pool = 0.01)
 uc_train <- training(uc_split)
 uc_test <- testing(uc_split)
 ```
@@ -130,7 +129,7 @@ uc_folds
 ### First Model 
 
 ```{r}
-car_rec <- recipe(model ~ price + miles + year +drivetrain+engine_size+transmission, data = uc_train) %>% 
+uc_rec <- recipe(model ~ price + miles + year +drivetrain+engine_size+transmission, data = uc_train) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_normalize(all_predictors())
 ```
@@ -142,7 +141,7 @@ lda_mod <- discrim_linear() %>%
 
 lda_wkflow <- workflow() %>% 
   add_model(lda_mod) %>% 
-  add_recipe(car_rec)
+  add_recipe(uc_rec)
 
 lda_fit <- fit(lda_wkflow, uc_train)
 ```
@@ -183,6 +182,7 @@ collect_metrics(lda_fit_k)
 best_lda_mod <- select_best(lda_fit_k, metric = 'roc_auc')
 
 ```
+
 ```{r}
 uc_lda_final <- finalize_workflow(lda_wkflow, best_lda_mod)
 uc_final_lda_fit <- fit(uc_lda_final, data = uc_train)
@@ -210,16 +210,17 @@ net_mod <-
   set_engine('glmnet')
 
 net_wkflw <- workflow() %>% 
-  add_recipe(car_rec) %>% 
+  add_recipe(uc_rec) %>% 
   add_model(net_mod)
 ```
 
 
 ```{r}
-net_grid <- grid_regular(penalty(range = c(-5, 5)), mixture(range = c(0,1)), levels = 10)
+net_grid <- grid_regular(penalty(range = c(-5, 5)), mixture(range = c(0,1)), levels = 3)
 net_grid
 
 ```
+
 ```{r}
 elastic_tune_res <-tune_grid(
   net_wkflw,
