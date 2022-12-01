@@ -18,7 +18,8 @@ library(rpart.plot)
 library(vip)
 library(janitor)
 library(discrim)
-
+library(randomForest)
+library(xgboost)
 ```
 
 
@@ -249,15 +250,113 @@ uc_elastic_final <- finalize_workflow(net_wkflw, best_elastic_mod)
 uc_elastic_final_fit <- fit(uc_elastic_final, data = uc_train)
 ```
 
-```{r}
-augment(pok_final_fit, new_data = pok_test) %>% 
-  roc_auc(type_1, .pred_Bug:.pred_Water)
 
-augment(pok_final_fit, new_data = pok_test) %>%
-  roc_curve(type_1, .pred_Bug:.pred_Water) %>%
+```{r}
+augment(uc_elastic_final_fit, new_data = uc_train) %>% 
+  roc_auc(model, .pred_3_Series:.pred_X3)
+
+augment(uc_elastic_final_fit, new_data = uc_train) %>%
+  roc_curve(model, .pred_3_Series:.pred_X3) %>%
   autoplot()
 
-augment(pok_final_fit, new_data = pok_test) %>%
-  conf_mat(truth = type_1, estimate = .pred_class) %>% 
+augment(uc_elastic_final_fit, new_data = uc_train) %>%
+  conf_mat(truth = model, estimate = .pred_class) %>% 
   autoplot(type = 'heatmap') 
 ```
+
+```{r}
+elastic_acc <- augment(uc_elastic_final_fit, new_data = uc_train) %>% 
+  accuracy(truth = model, estimate = .pred_class)
+elastic_acc
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Price Models (Regression)
+
+```{r}
+uc_rec2 <- recipe(price ~ model + miles + year +drivetrain+engine_size+transmission, data = uc_train) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_normalize(all_predictors())
+```
+
+```{r}
+net_mod2 <- 
+  linear_reg(penalty = tune(), mixture = tune()) %>% 
+  set_mode('regression') %>% 
+  set_engine('glmnet')
+
+net_wkflw2 <- workflow() %>% 
+  add_recipe(uc_rec2) %>% 
+  add_model(net_mod2)
+```
+
+```{r}
+elastic_tune_res2 <-tune_grid(
+  net_wkflw2,
+  resamples = uc_folds,
+  grid = net_grid
+)
+
+```
+
+
+```{r}
+collect_metrics(elastic_tune_res2) %>% arrange(desc(mean))
+
+```
+
+```{r}
+best_elastic_mod2 <- select_best(elastic_tune_res2, metric = 'rsq')
+uc_elastic_final2 <- finalize_workflow(net_wkflw2, best_elastic_mod2)
+uc_elastic_final_fit2 <- fit(uc_elastic_final2, data = uc_train)
+```
+
+
+```{r}
+# augment(uc_elastic_final_fit2, new_data = uc_train) %>% 
+#   roc_auc(model, .pred_3_Series:.pred_X3)
+# 
+# augment(uc_elastic_final_fit2, new_data = uc_train) %>%
+#   roc_curve(model, .pred_3_Series:.pred_X3) %>%
+#   autoplot()
+# 
+# augment(uc_elastic_final_fit2, new_data = uc_train) %>%
+#   conf_mat(truth = model, estimate = .pred_class) %>% 
+#   autoplot(type = 'heatmap') 
+# augment(uc_elastic_final_fit, new_data = uc_train) %>%
+#   rsq(truth = price, estimate = .pred)
+
+multi_metric <- metric_set(rmse, rsq, mae)
+uc_pred <- predict(uc_elastic_final_fit2, uc_train) %>% 
+  bind_cols(uc_train %>% dplyr::select(price))
+multi_metric(uc_pred, truth = price, estimate = .pred)
+```
+
+
