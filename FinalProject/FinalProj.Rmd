@@ -233,3 +233,31 @@ write_rds(elastic_tune_res, file = 'SavedModels/uc_elastic_res.rds')
 
 ```
 
+```{r}
+uc_elastic_res <- read_rds(file = 'SavedModels/uc_elastic_res.rds')
+
+```
+
+```{r}
+collect_metrics(uc_elastic_res) %>% arrange(desc(mean))
+
+```
+
+```{r}
+best_elastic_mod <- select_best(uc_elastic_res, metric = 'roc_auc')
+uc_elastic_final <- finalize_workflow(net_wkflw, best_elastic_mod)
+uc_elastic_final_fit <- fit(uc_elastic_final, data = uc_train)
+```
+
+```{r}
+augment(pok_final_fit, new_data = pok_test) %>% 
+  roc_auc(type_1, .pred_Bug:.pred_Water)
+
+augment(pok_final_fit, new_data = pok_test) %>%
+  roc_curve(type_1, .pred_Bug:.pred_Water) %>%
+  autoplot()
+
+augment(pok_final_fit, new_data = pok_test) %>%
+  conf_mat(truth = type_1, estimate = .pred_class) %>% 
+  autoplot(type = 'heatmap') 
+```
