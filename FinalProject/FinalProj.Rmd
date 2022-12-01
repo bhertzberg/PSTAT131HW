@@ -108,7 +108,7 @@ uc_test <- testing(uc_split)
 
 ```{r}
 uc_train %>% 
-  select(is.numeric) %>% 
+  dplyr::select(is.numeric) %>% 
   cor(use = "complete.obs") %>% 
   corrplot(type = "lower", diag = FALSE)
 ```
@@ -123,7 +123,8 @@ There is a slight positive correlation between engine size and miles, and a slig
 ### K-Fold
 
 ```{r}
-uc_folds <- vfold_cv(uc_train, v = 5)
+set.seed(619)
+uc_folds <- vfold_cv(uc_train, v = 5, strata = model)
 uc_folds
 ```
 
@@ -161,10 +162,10 @@ predicted_data <- predict(lda_fit, new_data = uc_train, type = 'prob')
 
 ```{r}
 augment(lda_fit, new_data = uc_train) %>% 
-  roc_auc(model, .pred_3_Series:.pred_X3)
+  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
 
 augment(lda_fit, new_data = uc_train) %>%
-  roc_curve(model, .pred_3_Series:.pred_X3) %>%
+  roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
   autoplot()
 
 augment(lda_fit, new_data = uc_train) %>%
@@ -217,7 +218,7 @@ net_wkflw <- workflow() %>%
 
 
 ```{r}
-net_grid <- grid_regular(penalty(range = c(-5, 5)), mixture(range = c(0,1)), levels = 3)
+net_grid <- grid_regular(penalty(range = c(-5, 5)), mixture(range = c(0,1)), levels = 10)
 net_grid
 
 ```
