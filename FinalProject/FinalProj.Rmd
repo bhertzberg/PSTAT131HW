@@ -223,7 +223,7 @@ net_grid
 
 ```
 
-```{r}
+```{r, eval = FALSE}
 elastic_tune_res <-tune_grid(
   net_wkflw,
   resamples = uc_folds,
@@ -254,10 +254,10 @@ uc_elastic_final_fit <- fit(uc_elastic_final, data = uc_train)
 
 ```{r}
 augment(uc_elastic_final_fit, new_data = uc_train) %>% 
-  roc_auc(model, .pred_3_Series:.pred_X3)
+  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
 
 augment(uc_elastic_final_fit, new_data = uc_train) %>%
-  roc_curve(model, .pred_3_Series:.pred_X3) %>%
+  roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
   autoplot()
 
 augment(uc_elastic_final_fit, new_data = uc_train) %>%
@@ -279,7 +279,7 @@ bagging_spec <- rand_forest(mtry = .cols()) %>%
 ```
 
 ```{r}
-bagging_spec <- rand_forest(mtry = tune()) %>% 
+bagging_spec <- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %>% 
   set_engine('ranger', importance = 'impurity') %>% 
   set_mode('classification')
 
@@ -290,7 +290,7 @@ rf_wf <- workflow() %>%
 ```
 
 ```{r}
-reg_grid <- grid_regular(mtry(range = c(1,8)), levels = 3)
+reg_grid <- grid_regular(mtry(range = c(1,8)), trees(range = c(10, 300)), min_n(range = c(2,12)), levels = 2)
 ```
 
 
