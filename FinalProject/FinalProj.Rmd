@@ -84,7 +84,7 @@ model_plot
 ```{r}
 model_counts <- table(uc_clean$model)
 
-common_models <- subset(uc_clean, model %in% names(model_counts[model_counts > 300]))
+common_models <- subset(uc_clean, model %in% names(model_counts[model_counts > 500]))
 common_models<-droplevels(common_models)
 
 ```
@@ -130,7 +130,7 @@ uc_folds
 ### First Model 
 
 ```{r}
-uc_rec <- recipe(model ~ price + miles + year +drivetrain+engine_size+transmission, data = uc_train) %>% 
+uc_rec <- recipe(model ~ price + miles + year +transmission, data = uc_train) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_normalize(all_predictors())
 ```
@@ -271,9 +271,64 @@ elastic_acc
 ```
 
 
+```{r}
+bagging_spec <- rand_forest(mtry = .cols()) %>%
+  set_engine("randomForest", importance = TRUE) %>%
+  set_mode("classification")
+```
+
+```{r}
+bagging_spec <- rand_forest(mtry = tune()) %>% 
+  set_engine('ranger', importance = 'impurity') %>% 
+  set_mode('classification')
 
 
+rf_wf <- workflow() %>% 
+  add_model(bagging_spec) %>% 
+  add_recipe(uc_rec)
+```
 
+```{r}
+reg_grid <- grid_regular(mtry(range = c(1,8)), levels = 3)
+```
+
+
+```{r, eval=FALSE}
+rf_res <- tune_grid(
+  rf_wf,
+  resamples = uc_folds,
+  grid = reg_grid
+)
+
+write_rds(rf_res, file = 'SavedModels/uc_rf_tuned_res1.rds')
+```
+
+```{r}
+collect_metrics(rf_res) %>% arrange(desc(mean))
+```
+
+
+```{r}
+best_rf1 <- select_best(rf_res, metric = "roc_auc")
+
+reg_tree_final1 <- finalize_workflow(rf_wf, best_rf1)
+
+reg_tree_final_fit1 <- fit(reg_tree_final1, data = uc_train)
+```
+
+
+```{r}
+augment(reg_tree_final_fit1, new_data = uc_train) %>% 
+  roc_auc(model, .pred_3_Series:.pred_X3)
+
+augment(reg_tree_final_fit1, new_data = uc_train) %>%
+  roc_curve(model, .pred_3_Series:.pred_X3) %>%
+  autoplot()
+
+augment(reg_tree_final_fit1, new_data = uc_train) %>%
+  conf_mat(truth = model, estimate = .pred_class) %>% 
+  autoplot(type = 'heatmap') 
+```
 
 
 
@@ -358,5 +413,65 @@ uc_pred <- predict(uc_elastic_final_fit2, uc_train) %>%
   bind_cols(uc_train %>% dplyr::select(price))
 multi_metric(uc_pred, truth = price, estimate = .pred)
 ```
+
+
+### Random Forest Regression
+
+```{r}
+bagging_spec <- rand_forest(mtry = .cols()) %>%
+  set_engine("randomForest", importance = TRUE) %>%
+  set_mode("regression")
+```
+
+```{r}
+bagging_spec <- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %>% 
+  set_engine('ranger', importance = 'impurity') %>% 
+  set_mode('regression')
+
+
+rf_wf <- workflow() %>% 
+  add_model(bagging_spec) %>% 
+  add_recipe(uc_rec2)
+```
+
+```{r}
+reg_grid <- grid_regular(mtry(range = c(1,8)), trees(range = c(10, 300)), min_n(range = c(2,12)), levels = 3)
+```
+
+
+```{r, eval=FALSE}
+rf_res2 <- tune_grid(
+  rf_wf,
+  resamples = uc_folds,
+  grid = reg_grid
+)
+
+write_rds(rf_res2, file = 'SavedModels/uc_rf_tuned_res.rds')
+```
+
+```{r}
+collect_metrics(rf_res2) %>% arrange(desc(mean))
+```
+
+```{r}
+best_rf <- select_best(rf_res2, metric = "rmse")
+
+reg_tree_final <- finalize_workflow(rf_wf, best_rf)
+
+reg_tree_final_fit <- fit(reg_tree_final, data = uc_train)
+```
+
+```{r}
+augment(reg_tree_final_fit, new_data = uc_train) %>%
+  rmse(truth = price, estimate = .pred)
+```
+
+```{r}
+augment(reg_tree_final_fit, new_data = uc_train) %>%
+  ggplot(aes(price, .pred)) +
+  geom_abline() +
+  geom_point(alpha = 0.5)
+```
+
 
 
