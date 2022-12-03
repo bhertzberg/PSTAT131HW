@@ -20,6 +20,7 @@ library(janitor)
 library(discrim)
 library(randomForest)
 library(xgboost)
+library(kernlab)
 ```
 
 
@@ -273,12 +274,18 @@ write_rds(rf_res, file = 'SavedModels/uc_rf_tuned_res1.rds')
 ```
 
 ```{r}
-collect_metrics(rf_res) %>% arrange(desc(mean))
+uc_rf_res <- read_rds(file = 'SavedModels/uc_rf_tuned_res1.rds')
+
 ```
 
 
 ```{r}
-best_rf1 <- select_best(rf_res, metric = "roc_auc")
+collect_metrics(uc_rf_res) %>% arrange(desc(mean))
+```
+
+
+```{r}
+best_rf1 <- select_best(uc_rf_res, metric = "roc_auc")
 
 reg_tree_final1 <- finalize_workflow(rf_wf, best_rf1)
 
@@ -288,10 +295,10 @@ reg_tree_final_fit1 <- fit(reg_tree_final1, data = uc_train)
 
 ```{r}
 augment(reg_tree_final_fit1, new_data = uc_train) %>% 
-  roc_auc(model, .pred_3_Series:.pred_X3)
+  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
 
 augment(reg_tree_final_fit1, new_data = uc_train) %>%
-  roc_curve(model, .pred_3_Series:.pred_X3) %>%
+  roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
   autoplot()
 
 augment(reg_tree_final_fit1, new_data = uc_train) %>%
@@ -299,9 +306,32 @@ augment(reg_tree_final_fit1, new_data = uc_train) %>%
   autoplot(type = 'heatmap') 
 ```
 
+```{r}
+rf_acc <- augment(reg_tree_final_fit1, new_data = uc_train) %>% 
+  accuracy(truth = model, estimate = .pred_class)
+rf_acc
+```
 
 
+### model 3
 
+```{r}
+svm_linear_spec <- svm_poly(degree = 1) %>%
+  set_mode("classification") %>%
+  set_engine("kernlab", scaled = FALSE)
+
+svm_linear_wf <- workflow() %>% 
+  add_model(svm_linear_spec) %>% 
+  add_recipe(uc_rec)
+
+svm_param_grid <- grid_regular(cost(), levels = 10)
+
+tune_res <- tune_grid(
+  svm_linear_wf, 
+  resamples = uc_folds, 
+  grid = svm_param_grid
+)
+```
 
 
 
