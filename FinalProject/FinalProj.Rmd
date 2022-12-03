@@ -321,7 +321,7 @@ svm_linear_spec <- svm_poly(degree = 1) %>%
   set_engine("kernlab", scaled = FALSE)
 
 svm_linear_wf <- workflow() %>% 
-  add_model(svm_linear_spec) %>% 
+  add_model(svm_linear_spec %>% set_args(cost = tune())) %>% 
   add_recipe(uc_rec)
 
 svm_param_grid <- grid_regular(cost(), levels = 10)
@@ -333,14 +333,52 @@ tune_res <- tune_grid(
 )
 ```
 
+```{r}
+write_rds(tune_res, file = 'SavedModels/uc_svm_res.rds')
+
+```
 
 
+```{r}
+uc_svm_res <- read_rds(file = 'SavedModels/uc_svm_res.rds')
+
+```
 
 
+```{r}
+collect_metrics(uc_svm_res) %>% arrange(desc(mean))
+
+```
 
 
+```{r}
+best_svm <- select_best(uc_svm_res, metric = "roc_auc")
+
+svm_final <- finalize_workflow(svm_linear_wf, best_svm)
+
+svm_final_fit1 <- fit(svm_final, data = uc_train)
+```
 
 
+```{r}
+svm_acc <- augment(svm_final_fit1, new_data = uc_train) %>% 
+  accuracy(truth = model, estimate = .pred_class)
+svm_acc
+```
+
+
+```{r}
+augment(svm_final_fit1, new_data = uc_train) %>% 
+  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+
+augment(svm_final_fit1, new_data = uc_train) %>%
+  roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
+  autoplot()
+
+augment(svm_final_fit1, new_data = uc_train) %>%
+  conf_mat(truth = model, estimate = .pred_class) %>% 
+  autoplot(type = 'heatmap') 
+```
 
 
 
