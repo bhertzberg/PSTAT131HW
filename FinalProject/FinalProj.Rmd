@@ -247,6 +247,8 @@ elastic_acc
 ```
 
 
+### second model
+
 ```{r}
 rf_spec <- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %>% 
   set_engine('ranger', importance = 'impurity') %>% 
@@ -315,7 +317,7 @@ rf_acc
 
 ### model 3
 
-```{r}
+```{r, eval = FALSE}
 svm_linear_spec <- svm_poly(degree = 1) %>%
   set_mode("classification") %>%
   set_engine("kernlab", scaled = FALSE)
@@ -331,9 +333,7 @@ tune_res <- tune_grid(
   resamples = uc_folds, 
   grid = svm_param_grid
 )
-```
 
-```{r}
 write_rds(tune_res, file = 'SavedModels/uc_svm_res.rds')
 
 ```
@@ -412,6 +412,59 @@ augment(svm_rbf_fit, new_data = uc_train) %>%
   conf_mat(truth = model, estimate = .pred_class) %>% 
   autoplot(type = 'heatmap') 
 ```
+
+
+```{r, eval = FALSE}
+svm_poly_spec <- svm_poly() %>%
+  set_mode("classification") %>%
+  set_engine("kernlab", scaled = FALSE)
+
+svm_poly_wf <- workflow() %>% 
+  add_model(svm_poly_spec %>% set_args(cost = tune(), degree = 4)) %>% 
+  add_recipe(uc_rec)
+
+svm_poly_param_grid <- grid_regular(cost(), levels = 10)
+
+svm_poly_tune_res <- tune_grid(
+  svm_poly_wf, 
+  resamples = uc_folds, 
+  grid = svm_poly_param_grid
+)
+
+write_rds(svm_poly_tune_res, file = 'SavedModels/uc_svm_poly_res.rds')
+
+```
+
+
+```{r}
+uc_svm_poly_res <- read_rds(file = 'SavedModels/uc_svm_poly_res.rds')
+
+```
+
+
+```{r}
+collect_metrics(uc_svm_poly_res) %>% arrange(desc(mean))
+
+```
+
+
+```{r}
+best_poly_svm <- select_best(uc_svm_poly_res, metric = "roc_auc")
+
+poly_svm_final <- finalize_workflow(svm_linear_wf, best_poly_svm)
+
+poly_svm_final_fit1 <- fit(poly_svm_final, data = uc_train)
+```
+
+
+```{r}
+poly_svm_acc <- augment(poly_svm_final_fit1, new_data = uc_train) %>% 
+  accuracy(truth = model, estimate = .pred_class)
+poly_svm_acc
+```
+
+
+
 
 
 
