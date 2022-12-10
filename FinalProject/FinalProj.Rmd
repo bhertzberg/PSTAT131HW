@@ -2,7 +2,8 @@
 title: "FinalProject"
 author: "Ben Hertzberg"
 date: "2022-11-28"
-output: pdf_document
+output: pdf_document:
+  code_folding: hide
 ---
 
 ```{r setup, include=FALSE}
@@ -68,12 +69,12 @@ uc_clean <- subset(uc_clean, select = -c(id, vin, stock_no, seller_name, street,
 ```
 
 
-
+I removed 'trim' as well, because sometimes there are trim names that are unique to one specific car model. In those cases, the machine learning model wouldn't be predicting anything - just matching the model to the corresponding trim name. 
 ```{r}
 uc_clean <- subset(uc_clean, select = -c(trim))
-uc_clean <- subset(uc_clean, select = -c(state))
-
 ```
+
+Now that I removed the variables I know I didn't want, I reworked the remaining ones into formats that are easier to work with. I turned every categorical variable into a factor, and every continuous variable into a numeric variable. These steps prevent hiccups in the recipe building process.
 
 ```{r}
 uc_clean$make <- as.factor(uc_clean$make)
@@ -174,31 +175,14 @@ lda_fit <- fit(lda_wkflow, uc_train)
 lda_acc <- augment(lda_fit, new_data = uc_train) %>% 
   accuracy(truth = model, estimate = .pred_class)
 lda_acc
-```
-```{r}
-predicted_data <- predict(lda_fit, new_data = uc_train, type = 'prob')
 
-```
-
-
-```{r}
 augment(lda_fit, new_data = uc_train) %>% 
   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
-
-augment(lda_fit, new_data = uc_train) %>%
-  roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
-  autoplot()
-
-augment(lda_fit, new_data = uc_train) %>%
-  conf_mat(truth = model, estimate = .pred_class) %>% 
-  autoplot(type = 'heatmap') 
 ```
 
 
 
-
-
-### Second Model
+### First Model
 
 ```{r}
 net_mod <- 
@@ -567,133 +551,4 @@ augment(bst_final_fit, new_data = uc_train) %>%
   conf_mat(truth = model, estimate = .pred_class) %>% 
   autoplot(type = 'heatmap') 
 ```
-
-
-
-## Price Models (Regression)
-
-```{r}
-uc_rec2 <- recipe(price ~ model + miles + year +drivetrain+engine_size+transmission, data = uc_train) %>% 
-  step_dummy(all_nominal_predictors()) %>% 
-  step_normalize(all_predictors())
-```
-
-```{r}
-net_mod2 <- 
-  linear_reg(penalty = tune(), mixture = tune()) %>% 
-  set_mode('regression') %>% 
-  set_engine('glmnet')
-
-net_wkflw2 <- workflow() %>% 
-  add_recipe(uc_rec2) %>% 
-  add_model(net_mod2)
-```
-
-```{r}
-elastic_tune_res2 <-tune_grid(
-  net_wkflw2,
-  resamples = uc_folds,
-  grid = net_grid
-)
-
-```
-
-
-```{r}
-collect_metrics(elastic_tune_res2) %>% arrange(desc(mean))
-
-```
-
-```{r}
-best_elastic_mod2 <- select_best(elastic_tune_res2, metric = 'rsq')
-uc_elastic_final2 <- finalize_workflow(net_wkflw2, best_elastic_mod2)
-uc_elastic_final_fit2 <- fit(uc_elastic_final2, data = uc_train)
-```
-
-
-```{r}
-# augment(uc_elastic_final_fit2, new_data = uc_train) %>% 
-#   roc_auc(model, .pred_3_Series:.pred_X3)
-# 
-# augment(uc_elastic_final_fit2, new_data = uc_train) %>%
-#   roc_curve(model, .pred_3_Series:.pred_X3) %>%
-#   autoplot()
-# 
-# augment(uc_elastic_final_fit2, new_data = uc_train) %>%
-#   conf_mat(truth = model, estimate = .pred_class) %>% 
-#   autoplot(type = 'heatmap') 
-# augment(uc_elastic_final_fit, new_data = uc_train) %>%
-#   rsq(truth = price, estimate = .pred)
-
-multi_metric <- metric_set(rmse, rsq, mae)
-uc_pred <- predict(uc_elastic_final_fit2, uc_train) %>% 
-  bind_cols(uc_train %>% dplyr::select(price))
-multi_metric(uc_pred, truth = price, estimate = .pred)
-```
-
-
-### Random Forest Regression
-
-```{r}
-bagging_spec <- rand_forest(mtry = .cols()) %>%
-  set_engine("randomForest", importance = TRUE) %>%
-  set_mode("regression")
-```
-
-```{r}
-bagging_spec <- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %>% 
-  set_engine('ranger', importance = 'impurity') %>% 
-  set_mode('regression')
-
-
-rf_wf <- workflow() %>% 
-  add_model(bagging_spec) %>% 
-  add_recipe(uc_rec2)
-```
-
-```{r}
-reg_grid <- grid_regular(mtry(range = c(1,8)), trees(range = c(10, 300)), min_n(range = c(2,12)), levels = 3)
-```
-
-
-```{r, eval=FALSE}
-rf_res2 <- tune_grid(
-  rf_wf,
-  resamples = uc_folds,
-  grid = reg_grid
-)
-
-write_rds(rf_res2, file = 'SavedModels/uc_rf_tuned_res.rds')
-```
-
-```{r}
-uc_rf_reg_res <- read_rds(file = 'SavedModels/uc_rf_tuned_res.rds')
-```
-
-
-```{r}
-collect_metrics(uc_rf_reg_res) %>% arrange(desc(mean))
-```
-
-```{r}
-best_rf <- select_best(uc_rf_reg_res, metric = "rmse")
-
-reg_tree_final <- finalize_workflow(rf_wf, best_rf)
-
-reg_tree_final_fit <- fit(reg_tree_final, data = uc_train)
-```
-
-```{r}
-augment(reg_tree_final_fit, new_data = uc_train) %>%
-  rmse(truth = price, estimate = .pred)
-```
-
-```{r}
-augment(reg_tree_final_fit, new_data = uc_train) %>%
-  ggplot(aes(price, .pred)) +
-  geom_abline() +
-  geom_point(alpha = 0.5)
-```
-
-
 
