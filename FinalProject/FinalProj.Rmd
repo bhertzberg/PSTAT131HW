@@ -9,7 +9,16 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## Introduction
 
+In this project, I use a variety of machine learning models to predict the model of a used car listed for sale given general information about the vehicle. 
+
+  This may seem like an odd relationship to investigate, but in my eyes that was kind of the point. Originally, I planned on predicting a used car's price given the listing information. I wanted to see how make, model, mileage, year, etc would effect a used cars price, which could then be used to see if a car for sale was a good deal. However, although such a prediction might have more purpose in the real world, I realized I wasn't particularly interested in the relationships I was analyzing. Some models are cheaper than others. Cars with low mileage will be more expensive than those with higher mileage. Most, if not all, of the relationships between the predictor variables and the response followed very straightforward logic. As I built my original recipe, I wasn't excited to see what my models would reveal. So I decided to switch things up.
+  
+  Predicting a used car's model might not have a clear use in the real world, but as a newcomer to machine learning, it seemed far more interesting. There are not many common sense relationships between predictors and the response in this case. Multiple car models fall in the same price range. Any car can have any amount of miles driven. Given these obstacles, I wasn't sure it would even be possible. However, if the machine learning models could do it, I would have built a tool that learned relationships I don't understand myself, and that seemed a much more rewarding and captivating challenge.
+
+
+First things first - I loaded in a bunch of R packages, which provide prewritten code functions that I can use later on.
 ```{r, message=FALSE}
 library(tidyverse)
 library(tidymodels)
@@ -24,11 +33,21 @@ library(kernlab)
 ```
 
 
+### It All Starts With Data
+
+My models were trained on used car data taken from a Kaggle dataset provided by Rupesh Raundal, which can be found using this link:
+
+https://www.kaggle.com/datasets/3ea0a6a45dbd4713a8759988845f1a58038036d84515ded58f65a2ff2bd32e00?resource=download&select=us-dealers-used.csv
+
+Raundal provided a dataset for the US, as well as one for Canada, but I only used the US file. I read in the data, and cleaned up the variable names from the data set so they all follow snake case (no capitalization and words separated by underlines, which_looks_like_this).
+
 ```{r, eval = FALSE}
 used_cars <- read.csv('./UsedCars/us-dealers-used.csv')
 used_cars <- clean_names(used_cars)
 ```
-Import data set. Must subset before doing anything with the data, including fitering ot missing values, because it is too big. Receieved error: 'Error: cannot allocate vector of size 569.1 Mb'
+Importing the data was easier said than done - the file on US used cars was over 1.28 gigabytes and contained millions of data points. I had to immediately subset the data to prevent errors regarding memory allocation. I took a random sample of 50,000 cars to start off with. Prior to this, I set a random seed value, which allows the randomly chosen sample to be reproduced.
+
+With the data in a more manageable size, I filled all blank spaces with 'NA', which lets R know that there is no data contained. Then I removed all observations containing 'NA'.
 ```{r, eval = FALSE}
 set.seed(619)
 uc_subset<- sample_n(used_cars, size = 50000)
@@ -36,17 +55,18 @@ uc_subset[uc_subset ==""]<- NA
 uc_subset2 <- na.omit(uc_subset)
 write_rds(uc_subset2, file = 'data/used_cars_cleaned.rds')
 ```
-
+The result: a reasonably sized data set with standardized variable names and no missing data. I saved this into a new file so I wouldn't ever have to work with the original behemoth again.
 ```{r}
 uc_clean <- read_rds(file = 'data/used_cars_cleaned.rds')
 ```
 
+Right off the bat I removed variables I am not interested in. The original set had 21 variables(including model). I knew I 
+
 ```{r}
-uc_clean <- subset(uc_clean, select = -c(id, vin, stock_no, seller_name, street, city, zip)) %>%
+uc_clean <- subset(uc_clean, select = -c(id, vin, stock_no, seller_name, street, city, zip, state)) %>%
     mutate(model = str_replace(model, " ", "_"))
 ```
 
-Right off the bat I remove variables I am not interested in
 
 
 ```{r}
@@ -114,7 +134,7 @@ uc_train %>%
   corrplot(type = "lower", diag = FALSE)
 ```
 
-The correlation plot shows strong relationships between many of the continuous variables in this data set. Price has a strong negative correlation with miles, which makes sense - no car lasts forever, so people tend to prefer cars that have been driven less. There is a strong positive correlation between price and year, which means newer cars have a higher price. There is also a stong positive correlation between price and engine size; a car with a bigger engine will cost more. Car companies often tout the horsepower of a car, so assuming a larger engine means a more powerful vehicle, this relationship checks out too.
+The correlation plot shows strong relationships between many of the continuous variables in this data set. Price has a strong negative correlation with miles, which makes sense - no car lasts forever, so people tend to prefer cars that have been driven less. There is a strong positive correlation between price and year, which means newer cars have a higher price. There is also a strong positive correlation between price and engine size; a car with a bigger engine will cost more. Car companies often tout the horsepower of a car, so assuming a larger engine means a more powerful vehicle, this relationship checks out too.
 
 There is a very strong negative correlation between year and miles. This means newer cars (with a larger value for year) tend to have fewer miles driven on them. Sounds right to me. 
 
@@ -647,11 +667,16 @@ write_rds(rf_res2, file = 'SavedModels/uc_rf_tuned_res.rds')
 ```
 
 ```{r}
-collect_metrics(rf_res2) %>% arrange(desc(mean))
+uc_rf_reg_res <- read_rds(file = 'SavedModels/uc_rf_tuned_res.rds')
+```
+
+
+```{r}
+collect_metrics(uc_rf_reg_res) %>% arrange(desc(mean))
 ```
 
 ```{r}
-best_rf <- select_best(rf_res2, metric = "rmse")
+best_rf <- select_best(uc_rf_reg_res, metric = "rmse")
 
 reg_tree_final <- finalize_workflow(rf_wf, best_rf)
 
