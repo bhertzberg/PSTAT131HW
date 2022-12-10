@@ -463,11 +463,90 @@ poly_svm_acc <- augment(poly_svm_final_fit1, new_data = uc_train) %>%
 poly_svm_acc
 ```
 
+```{r}
+augment(poly_svm_final_fit1, new_data = uc_train) %>% 
+  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+
+augment(poly_svm_final_fit1, new_data = uc_train) %>%
+  roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
+  autoplot()
+
+augment(poly_svm_final_fit1, new_data = uc_train) %>%
+  conf_mat(truth = model, estimate = .pred_class) %>% 
+  autoplot(type = 'heatmap') 
+```
+
+### Model 4
+```{r}
+boost_spec <- boost_tree(trees = 5000, tree_depth = 4) %>%
+  set_engine("xgboost") %>%
+  set_mode("regression")
+```
 
 
+```{r}
+boost_spec <- boost_tree(mtry = tune(), trees = tune(), min_n = tune()) %>%
+  set_engine("xgboost") %>%
+  set_mode("classification")
+
+bst_wf <- workflow() %>% 
+  add_model(boost_spec) %>% 
+  add_recipe(uc_rec)
+```
+
+```{r}
+bst_grid <- grid_regular(mtry(range = c(1,4)), trees(range = c(10, 1000)), min_n(range = c(2,12)), levels = 4)
+```
 
 
+```{r, eval=FALSE}
+bst_res <- tune_grid(
+  bst_wf,
+  resamples = uc_folds,
+  grid = bst_grid
+)
 
+write_rds(bst_res, file = 'SavedModels/uc_bst_tuned_res.rds')
+```
+
+```{r}
+uc_boosted_res <- read_rds(file = 'SavedModels/uc_bst_tuned_res.rds')
+
+```
+
+
+```{r}
+collect_metrics(uc_boosted_res) %>% arrange(desc(mean))
+
+```
+
+```{r}
+best_bst <- select_best(uc_boosted_res, metric = "roc_auc")
+
+bst_final <- finalize_workflow(bst_wf, best_bst)
+
+bst_final_fit <- fit(bst_final, data = uc_train)
+```
+
+
+```{r}
+bst_acc <- augment(bst_final_fit, new_data = uc_train) %>% 
+  accuracy(truth = model, estimate = .pred_class)
+bst_acc
+```
+
+```{r}
+augment(bst_final_fit, new_data = uc_train) %>% 
+  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+
+augment(bst_final_fit, new_data = uc_train) %>%
+  roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
+  autoplot()
+
+augment(bst_final_fit, new_data = uc_train) %>%
+  conf_mat(truth = model, estimate = .pred_class) %>% 
+  autoplot(type = 'heatmap') 
+```
 
 
 
