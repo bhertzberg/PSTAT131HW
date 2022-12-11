@@ -122,24 +122,10 @@ type_1_plot<-ggplot(common_models, aes(y = model)) +
 type_1_plot
 ```
 
-Much better.
-
-### Splitting
-
-Before I explored my data further, I decided it was time to make the split between 
+Much better. My next exploratory mission was to see how the continuous variables in my data set are correlated. 
 
 ```{r}
-set.seed(619)
-uc_split <- initial_split(common_models, prop = 0.80, strata = model, pool = 0.01)
-uc_train <- training(uc_split)
-uc_test <- testing(uc_split)
-```
-
-I chose to put 80% of the data into the training set and left the remaining 20% for the test set. The training set will be used to train all of the machine learning algorithms. It is necessary to keep a separate testing set to see how well a model performs on data that it has never seen before. The test set will only be used to check how well my best model. Until then, I will have no interaction with the test set to ensure model integrity. This means all of my initial exploring will be done on the training set.
-
-
-```{r}
-uc_train %>% 
+common_models %>% 
   dplyr::select(is.numeric) %>% 
   cor(use = "complete.obs") %>% 
   corrplot(type = "lower", diag = FALSE)
@@ -149,10 +135,25 @@ The correlation plot shows strong relationships between many of the continuous v
 
 There is a very strong negative correlation between year and miles. This means newer cars (with a larger value for year) tend to have fewer miles driven on them. Sounds right to me. 
 
-There is a slight positive correlation between engine size and miles, and a slight negative correlation between engine size and year. These relationships are harder to explain. The first relationship is a mystery to me. As far as the second one, my best guess would be that cars have gotten smaller and more fuel efficient in recent years, which might mean engine sizes have decreased.
+There is a slight positive correlation between engine size and miles, and a slight negative correlation between engine size and year. These relationships are harder to explain. The first one is a mystery to me. As far as the second relationship, my best guess would be that cars have gotten smaller and more fuel efficient in recent years, which might mean engine sizes have decreased.
 
+### Splitting
 
-### K-Fold
+The last thing standing between me and model training is splitting the data. I set my random seed to be able to reproduce the same split in the future, and divided my data in what is called the initial split.
+
+```{r}
+set.seed(619)
+uc_split <- initial_split(common_models, prop = 0.80, strata = model, pool = 0.01)
+uc_train <- training(uc_split)
+uc_test <- testing(uc_split)
+```
+
+I chose to put 80% of the data into the training set and left the remaining 20% for the test set. I stratified the split on the outcome variable, model - this ensures that there will be a proportional amount of observations for every possible outcome in both sets. That way, even if there are models with fewer counts, they won't get accidentally overlooked during random split. 
+The training set will be used to train all of the machine learning algorithms. It is necessary to have a separate testing set to see how well a model performs on data that it has never seen before. This is done to check for overfitting, where a model will specialize in predicting with the data it was trained on, but do a poor job making predictions with new data. The test set will only be used to check how well my best model performs. Until then, I will have no interaction with the test set to maintain model integrity.
+
+That being said, it is almost always a good idea to test a model as you are working on it so you can tweak it and make improvements. How do you do that if you can't touch the test set? Split the training set once again!
+
+Or, in this case, split it 5 times!
 
 ```{r}
 set.seed(619)
@@ -160,13 +161,23 @@ uc_folds <- vfold_cv(uc_train, v = 5, strata = model)
 uc_folds
 ```
 
-### Basic 
+This method is known as k-fold cross-validation. The general idea is to break the training set into 'k' smaller sets, known as folds. One fold will become a sort of mini testing set, known as an analysis set, and all the other folds are combined into a mini training set, known as the assessment set. Train a model on the assessment set, and test that model on the analysis set. Repeat this 'k' times, using a different fold as the analysis set each time, and take the model that performs the best on the analysis set. This effectively allows us to pick a model that avoids overfitting, before we take a crack at the test set from the initial split.
+
+### Time to Train Models
+
+In R, every machine learning model is based on a recipe. In a recipe, you define what the outcome variable will be, what variables will be used as predictors, and what data to use. I knew my outcome variable is the car model, but I was a little uncertain as to which of the other variables I should use as predictors. For example, engine size might have useful information the model can use to make predictions in the future, but what if a specific engine size only showed up for one specific car model? My guess is that the machine learning model would predict that outcome every time that specific engine size was inputted, which undermines my goal of creating a tool that can make predictions based on relationships I don't understand.
+
+To ensure the machine learning models wouldn't find any convenient shortcuts, I only used four predictor variables - price, miles, year, and transmission. I know for a fact that any car model can have any possible value for all of these predictors, so the ML models will have to dig a little deeper when making predictions.
+
+In the recipe I dummy encoded all of the categorical predictors, which assigns specific values to each category for easier analysis. I then normalized all of the predictors, which prevents scaling issues from arising later on.
 
 ```{r}
 uc_rec <- recipe(model ~ price + miles + year +transmission, data = uc_train) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_normalize(all_predictors())
 ```
+
+
 
 ```{r}
 lda_mod <- discrim_linear() %>% 
