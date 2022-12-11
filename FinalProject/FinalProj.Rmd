@@ -14,12 +14,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 In this project, I use a variety of machine learning models to predict the model of a used car listed for sale given general information about the vehicle. 
 
-  This may seem like an odd relationship to investigate, but in my eyes that was kind of the point. Originally, I planned on predicting a used car's price given the listing information. I wanted to see how make, model, mileage, year, etc would effect a used cars price, which could then be used to see if a car for sale was a good deal. However, although such a prediction might have more purpose in the real world, I realized I wasn't particularly interested in the relationships I was analyzing. Some models are cheaper than others. Cars with low mileage will be more expensive than those with higher mileage. Most, if not all, of the relationships between the predictor variables and the response followed very straightforward logic. As I built my original recipe, I wasn't excited to see what my models would reveal. So I decided to switch things up.
+This may seem like an odd relationship to investigate, but in my eyes that was kind of the point. Originally, I planned on predicting a used car's price given the listing information. I wanted to see how make, model, mileage, year, etc would effect a used cars price, which could then be used to see if a car for sale was a good deal. However, although such a prediction might have more purpose in the real world, I realized I wasn't particularly interested in the relationships I was analyzing. Some models are cheaper than others. Cars with low mileage will be more expensive than those with higher mileage. Most, if not all, of the relationships between the predictor variables and the response followed very straightforward logic. As I built my original recipe, I wasn't excited to see what my models would reveal. So I decided to switch things up.
   
-  Predicting a used car's model might not have a clear use in the real world, but as a newcomer to machine learning, it seemed far more interesting. There are not many common sense relationships between predictors and the response in this case. Multiple car models fall in the same price range. Any car can have any amount of miles driven. Given these obstacles, I wasn't sure it would even be possible. However, if the machine learning models could do it, I would have built a tool that learned relationships I don't understand myself, and that seemed a much more rewarding and captivating challenge.
-
+Predicting a used car's model might not have a clear use in the real world, but as a newcomer to machine learning, it seemed far more interesting. There are not many common sense relationships between predictors and the response in this case. Multiple car models fall in the same price range. Any car can have any amount of miles driven. Given these obstacles, I wasn't sure it would even be possible. However, if the machine learning models could do it, I would have built a tool that learned relationships I don't understand myself, and that seemed a much more rewarding and captivating challenge.
 
 First things first - I loaded in a bunch of R packages, which provide prewritten code functions that I can use later on.
+
 ```{r, message=FALSE}
 library(tidyverse)
 library(tidymodels)
@@ -33,8 +33,7 @@ library(xgboost)
 library(kernlab)
 ```
 
-
-### It All Starts With Data
+## It All Starts With Data
 
 My models were trained on used car data taken from a Kaggle dataset provided by Rupesh Raundal, which can be found using this link:
 
@@ -48,9 +47,11 @@ Raundal provided a dataset for the US, as well as one for Canada, but I only use
 used_cars <- read.csv('./UsedCars/us-dealers-used.csv')
 used_cars <- clean_names(used_cars)
 ```
+
 Importing the data was easier said than done - the file on US used cars was over 1.28 gigabytes and contained millions of data points. I had to immediately subset the data to prevent errors regarding memory allocation. I took a random sample of 50,000 cars to start off with. Prior to this, I set a random seed value, which allows the randomly chosen sample to be reproduced.
 
 With the data in a more manageable size, I filled all blank spaces with 'NA', which lets R know that there is no data contained. Then I removed all observations containing 'NA'. After passing through this filter, the data set contained 43,551 observations.
+
 ```{r, eval = FALSE}
 set.seed(619)
 uc_subset<- sample_n(used_cars, size = 50000)
@@ -58,20 +59,24 @@ uc_subset[uc_subset ==""]<- NA
 uc_subset2 <- na.omit(uc_subset)
 write_rds(uc_subset2, file = 'data/used_cars_cleaned.rds')
 ```
+
 The result: a reasonably sized data set with standardized variable names and no missing data. I saved this into a new file so I wouldn't ever have to work with the original behemoth again.
+
 ```{r}
 uc_clean <- read_rds(file = 'data/used_cars_cleaned.rds')
 ```
 
-Right off the bat I removed variables I am not interested in. The original set had 21 variables(including model). I knew I 
+Right off the bat I removed variables I am not interested in. The original set had 21 variables(including model). I was not interested in the vehicles ID, VIN or stock number, and did not need information on the seller name and location.
+
+I also made one adjustment to the outcome variable. Some of the model names contained spaces, which can be problematic when coding. So I replaced all spaces in the car model categories with underscores, following the snake case that I used for variable names.
 
 ```{r}
 uc_clean <- subset(uc_clean, select = -c(id, vin, stock_no, seller_name, street, city, zip, state)) %>%
     mutate(model = str_replace(model, " ", "_"))
 ```
 
-
 I removed 'trim' as well, because sometimes there are trim names that are unique to one specific car model. In those cases, the machine learning model wouldn't be predicting anything - just matching the model to the corresponding trim name. 
+
 ```{r}
 uc_clean <- subset(uc_clean, select = -c(trim))
 ```
@@ -96,7 +101,7 @@ uc_clean$year <- as.numeric(uc_clean$year)
 
 
 
-### Exploring the Data
+## Exploring the Data
 
 The next step was taking a look at the data to get a better idea of what I was working with. I first wanted to know what the spread of my outcome variable, car model, looked like.
 
@@ -113,7 +118,6 @@ model_counts <- table(uc_train$model)
 
 common_models <- subset(uc_clean, model %in% names(model_counts[model_counts > 500]))
 common_models<-droplevels(common_models)
-
 ```
 
 I saved these more popular vehicles in a data set called 'common_models', which contains 11,910 observations. Lets see what the spread of the car models looks like now.
@@ -141,6 +145,7 @@ There is a slight positive correlation between engine size and miles, and a slig
 
 
 Finally, I took a look at how price and car model are related by plotting the counts for each car model in separate histograms. I set the range of prices to be from $0 to $80,000. Each histogram has 10 bins, each of which has a range of $8,000. 
+
 ```{r, warning=FALSE}
 ggplot(common_models, aes(price)) +
   geom_histogram(bins = 10, color = "white") +
@@ -151,9 +156,10 @@ ggplot(common_models, aes(price)) +
     title = "Histogram of Model Counts based on Price"
   )
 ```
+
 The histograms for the Accord, CR-V, and Grand Cherokee are clearly skewed left. The histograms for the Civic, Equinox, Escape, F-150, Ram 1500, and Silverado are approximately normal. The other car models don't follow as clear distributions, but most are more or less normal or slighlty skewed left. The Explorer, the F-150, the Ram 1500, and the Silverado appear to have the widest range of prices, and are the only models that approach or surpass the $60,000 bin.
 
-### Splitting
+## Splitting
 
 The last thing standing between me and model training was splitting the data. I set my random seed to be able to reproduce the same split in the future, and divided my data in what is called the initial split.
 
@@ -179,7 +185,7 @@ uc_folds
 
 This method is known as k-fold cross-validation. The general idea is to break the training set into 'k' smaller sets, known as folds. One fold will become a sort of mini testing set, known as an analysis set, and all the other folds are combined into a mini training set, known as the assessment set. Train a model on the assessment set, and test that model on the analysis set. Repeat this 'k' times, using a different fold as the analysis set each time, and take the model that performs the best on the analysis set. This effectively allows us to pick a model that avoids overfitting, before we take a crack at the test set from the initial split.
 
-### Time to Train Models
+## Time to Train Models
 
 In R, every machine learning model is based on a recipe. In a recipe, you define what the outcome variable will be, what variables will be used as predictors, and what data to use. I knew my outcome variable is the car model, but I was a little uncertain as to which of the other variables I should use as predictors. For example, engine size might have useful information the model can use to make predictions in the future, but what if a specific engine size only showed up for one specific car model? My guess is that the machine learning model would predict that outcome every time that specific engine size was inputted, which undermines my goal of creating a tool that can make predictions based on relationships I don't understand.
 
@@ -193,8 +199,7 @@ uc_rec <- recipe(model ~ price + miles + year +transmission, data = uc_train) %>
   step_normalize(all_predictors())
 ```
 
-
-#### Basic Model
+### Basic Model
 
 Before I took a crack at training a more complicated ML model, I wanted to see how effective a very simple model would be. I decided to use Linear Discriminant Analysis, one of the most basic ways to make predictions in a classification problem with multiple possible outcomes. I trained it using the entire training set, because I was not planning on making any adjustments to this first model.
 
@@ -223,12 +228,12 @@ augment(lda_fit, new_data = uc_train) %>%
 
 I checked two measures of model success, which are accuracy and ROC_AUC. Accuracy ranges from 0 (bad) to 1 (good), and ROC_AUC effectively ranges from 0.5 (bad) to 1 (good). This basic model had an accuracy of 0.245 and an ROC_AUC of 0.798 - not so good, as expected. Let's see if more complex models will do a better job.
 
-
 ### First Model
 
 Ok, time for the first serious model. I chose to use an elastic net, which is a linear combination of lasso and ridge regularization. These methods use a penalty value to decrease the variance of the ML model's prediction. Elastic net combines the two into a single model, and chooses the weight of each with the mixture value.
 
 First, I created the elastic net model and set the penalty and mixture values equal to tune(). This allowed me to specify a range of possible values for those inputs. Every possible combination of those inputs are tried during training (and repeated across 5 different folds due to cross validation). This makes for some looooong training times, but the result can be a very effective model.
+
 ```{r}
 net_mod <- 
   multinom_reg(penalty = tune(), mixture = tune()) %>% 
@@ -240,12 +245,14 @@ net_wkflw <- workflow() %>%
   add_model(net_mod)
 ```
  
-Here I created a grid of possible ranges for the penalty and mixture inputs, and specified that I want 10 levels (equally spaced out values) chosen from those ranges. 
+Here I created a grid of possible ranges for the penalty and mixture inputs, and specified that I want 10 levels (equally spaced out values) chosen from those ranges.
+
 ```{r}
 net_grid <- grid_regular(penalty(range = c(-5, 5)), mixture(range = c(0,1)), levels = 10)
 ```
 
 Finally, it's time to train a model using cross validation and tuning. In this case, I have 10 levels of 'penalty', 10 levels of 'mixture', and 5 folds, which means 10*10*5 = 500 models are about to get trained! As I said before, cross validation and tuning can take a long time, and this is the reason why. To avoid spending that time in the future, I saved the ML models to a separate file, where I can import the results directly rather than train them all again.
+
 ```{r, eval = FALSE}
 elastic_tune_res <-tune_grid(
   net_wkflw,
@@ -253,24 +260,23 @@ elastic_tune_res <-tune_grid(
   grid = net_grid
 )
 
-
 write_rds(elastic_tune_res, file = 'SavedModels/uc_elastic_res.rds')
-
 ```
 
 Now that I saved the elastic net models, I simply read them in as shown below.
+
 ```{r}
 uc_elastic_res <- read_rds(file = 'SavedModels/uc_elastic_res.rds')
-
 ```
 
 I then viewed a table to see how the best elastic net models performed, based on their ROC_AUC.
+
 ```{r}
 head(collect_metrics(uc_elastic_res) %>% arrange(desc(mean)))
-
 ```
 
 I selected the best elastic net model, added it to a new, finalized workflow, and fit it to the entire training set.
+
 ```{r}
 best_elastic_mod <- select_best(uc_elastic_res, metric = 'roc_auc')
 uc_elastic_final <- finalize_workflow(net_wkflw, best_elastic_mod)
@@ -278,6 +284,7 @@ uc_elastic_final_fit <- fit(uc_elastic_final, data = uc_train)
 ```
 
 Then I checked final elastic net model's performance on the training data.
+
 ```{r}
 elastic_acc <- augment(uc_elastic_final_fit, new_data = uc_train) %>% 
   accuracy(truth = model, estimate = .pred_class)
@@ -286,19 +293,20 @@ elastic_acc
 augment(uc_elastic_final_fit, new_data = uc_train) %>% 
   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
 ```
+
 Accuracy: 0.281
 ROC_AUC: 0.820
 
 Still not good. But both measures are higher than the basic model, so things are heading in the right direction.
 
-### second model
+### Second Model
 
 Up next is a random forest model. This is a very popular ML model, and I expected it to be the most effective for my purpose. Below, I set up a random forest workflow, and prepare to tune three hyperparameters: mtry, trees, and min_n.
+
 ```{r}
 rf_spec <- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %>% 
   set_engine('ranger', importance = 'impurity') %>% 
   set_mode('classification')
-
 
 rf_wf <- workflow() %>% 
   add_model(rf_spec) %>% 
@@ -306,11 +314,13 @@ rf_wf <- workflow() %>%
 ```
 
 For tuning, I set up another grid specifying the ranges of each hyperparameter and the number of levels. With 3 hyperparameters, 8 levels, and 5 folds, there will be 8*8*8*5 = 2560 models trained!
+
 ```{r}
 reg_grid <- grid_regular(mtry(range = c(1,4)), trees(range = c(10, 300)), min_n(range = c(2,12)), levels = 8)
 ```
 
 I tuned the model and saved the results so I wouldn't have to repeat the training process.
+
 ```{r, eval=FALSE}
 rf_res <- tune_grid(
   rf_wf,
@@ -320,18 +330,21 @@ rf_res <- tune_grid(
 
 write_rds(rf_res, file = 'SavedModels/uc_rf_tuned_res1.rds')
 ```
+
 Then I read in the results.
+
 ```{r}
 uc_rf_res <- read_rds(file = 'SavedModels/uc_rf_tuned_res1.rds')
-
 ```
 
 Once again, I took a peak at the best performing models.
+
 ```{r}
 collect_metrics(uc_rf_res) %>% arrange(desc(mean))
 ```
 
 Then I selected the best random forest model, fit it to a new workflow, and fit it to the entire training set.
+
 ```{r}
 best_rf1 <- select_best(uc_rf_res, metric = "roc_auc")
 
@@ -341,6 +354,7 @@ rf_final_fit <- fit(rf_final1, data = uc_train)
 ```
 
 Time to check the model on the training set.
+
 ```{r}
 rf_acc <- augment(rf_final_fit, new_data = uc_train) %>% 
   accuracy(truth = model, estimate = .pred_class)
@@ -350,11 +364,13 @@ augment(rf_final_fit, new_data = uc_train) %>%
   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
 
 ```
+
 The random forest model got an accuracy of 0.725 and an ROC_ACU of 0.979. Not bad at all!
 
-### model 3
+### Third Model
 
 The third model is a linear support vector machine, known as an SVM. I created a workflow, prepared to tune the hyperparameter cost, and create a grid of 10 values for that hyperparameter. Then I tuned the model and saved the results.
+
 ```{r, eval = FALSE}
 svm_linear_spec <- svm_poly(degree = 1) %>%
   set_mode("classification") %>%
@@ -373,22 +389,22 @@ tune_res <- tune_grid(
 )
 
 write_rds(tune_res, file = 'SavedModels/uc_svm_res.rds')
-
 ```
 
 I read the results from the saved file.
+
 ```{r}
 uc_svm_res <- read_rds(file = 'SavedModels/uc_svm_res.rds')
-
 ```
 
 Once again, I looked at all the best performing models.
+
 ```{r}
 head(collect_metrics(uc_svm_res) %>% arrange(desc(mean)))
-
 ```
 
 Then I selected the best linear SVM and fit it to the entire training set.
+
 ```{r}
 best_svm <- select_best(uc_svm_res, metric = "roc_auc")
 
@@ -404,13 +420,14 @@ svm_final_fit1 <- fit(svm_final, data = uc_train)
 #   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
 
 #commented out the accuracy/ROC_AUC code because it takes a long time to run and made knitting difficult. I recorded the values in the text below.
-
 ```
+
 The linear SVM got an accuracy of 0.209 and an ROC_AUC of 0.753. This is worse than the most basic model. 
 
 The lectures for this course did not fully cover SVMs, so I couldn't analyze this result as well as I would have liked to. However, my best guess was that I used a linear SVM to try and model a non linear relationship, so I took another crack at it with a polynomial SVM. Ideally, I would have set the hyperparameter 'degree' to be tuned, but something about training the SVMs took an extremely long time, and my computer would not have been able to handle it. So I left 'cost' as the only hyperparameter to be tuned, and specified degree to be 4 (as opposed to 1, which was its value for the linear case). I chose 4 because there are four predictors in the recipe, but without more time to learn about SVMs in class, this choice was rather arbitrary.
 
 The process is the same as for the linear case, with degree set to equal 4 instead of 1.
+
 ```{r, eval = FALSE}
 svm_poly_spec <- svm_poly() %>%
   set_mode("classification") %>%
@@ -429,16 +446,16 @@ svm_poly_tune_res <- tune_grid(
 )
 
 write_rds(svm_poly_tune_res, file = 'SavedModels/uc_svm_poly_res.rds')
-
 ```
 
 I read in the saved data for the tuned polynomial SVMs
+
 ```{r}
 uc_svm_poly_res <- read_rds(file = 'SavedModels/uc_svm_poly_res.rds')
-
 ```
 
 I chose the best polynomial SVM based on ROC_AUC.
+
 ```{r}
 best_poly_svm <- select_best(uc_svm_poly_res, metric = "roc_auc")
 
@@ -455,11 +472,13 @@ poly_svm_final_fit1 <- fit(poly_svm_final, data = uc_train)
 
 #commented out the accuracy/ROC_AUC code because it takes a long time to run and made knitting difficult. I recorded the values in the text below.
 ```
+
 The polynomial SVM got an accuracy of 0.262 and an ROC_AUC of 0.751. Barely better accuracy than the basic model, and slightly worse ROC_AUC than the basic model.
 
 Changing the 'degree' value to 4 did not make much of a difference. Without the clearest understanding of SVMs, I was unable to figure out why this was the case. However, while researching and preparing these two SVM models, I saw that radial SVMs might be a better bet for non linear data. I decided against tuning dozens of radial SVMs with cross validation, but figured I would take a crack at one just to see what would happen. 
 
 I prepared a radial SVM and fit it to the entire training set. Although I was only training the one model and it was not too time intensive, I saved the model to a separate file to speed things up just slightly in the future.
+
 ```{r, eval = FALSE}
 svm_rbf_spec <- svm_rbf() %>%
   set_mode("classification") %>%
@@ -467,19 +486,18 @@ svm_rbf_spec <- svm_rbf() %>%
 
 svm_rbf_fit <- svm_rbf_spec %>%
   fit(model ~ price + miles + year +transmission, data = uc_train)
-```
 
-```{r}
 write_rds(svm_rbf_fit, file = 'SavedModels/uc_svm_radial_res.rds')
 ```
 
 I read in the saved data for the radial SVM.
+
 ```{r}
 uc_svm_rad_res <- read_rds(file = 'SavedModels/uc_svm_radial_res.rds')
-
 ```
 
 The moment of SVM truth:
+
 ```{r}
 # svm_rad_acc <- augment(uc_svm_rad_res, new_data = uc_train) %>% 
 #   accuracy(truth = model, estimate = .pred_class)
@@ -491,14 +509,15 @@ The moment of SVM truth:
 #commented out the accuracy/ROC_AUC code because it takes a long time to run and made knitting difficult. I recorded the values in the text below.
 
 ```
+
 The radial SVM got an accuracy of 0.327 and an ROC_AUC of 0.745. Slightly better accuracy than the basic model and the other SVMs, but slightly worse ROC_AUC those models too.
 
 At this point I was quite fed up with SVMs and decided to move on.
 
-
-### Model 4
+### Fourth Model
 
 The last type of model I used was a boosted tree. I set up a boosted tree specification to be used in the workflow. The hyperparameters to be tuned were mtry, trees, and min_n, just like in the random forest models.
+
 ```{r}
 boost_spec <- boost_tree(mtry = tune(), trees = tune(), min_n = tune()) %>%
   set_engine("xgboost") %>%
@@ -510,11 +529,13 @@ bst_wf <- workflow() %>%
 ```
 
 In this case, I decided to increase the range of 'trees' to go up to 1000 (compared to the random forest tuning which went up to 300). These larger models would take longer to train, so I reduced the number of levels from 8 to 4 to reduce time consumption. This time around, I would only be training 4*4*4*5 = 320 models.
+
 ```{r}
 bst_grid <- grid_regular(mtry(range = c(1,4)), trees(range = c(10, 1000)), min_n(range = c(2,12)), levels = 4)
 ```
 
 I tuned the parameters across all the folds and saved the results.
+
 ```{r, eval=FALSE}
 bst_res <- tune_grid(
   bst_wf,
@@ -526,16 +547,17 @@ write_rds(bst_res, file = 'SavedModels/uc_bst_tuned_res.rds')
 ```
 
 Then I read the results back in.
+
 ```{r}
 uc_boosted_res <- read_rds(file = 'SavedModels/uc_bst_tuned_res.rds')
-
 ```
 
 The best models according to ROC_AUC are listed below.
+
 ```{r}
 head(collect_metrics(uc_boosted_res) %>% arrange(desc(mean)))
-
 ```
+
 It looks like the model with mtry = 1, trees = 340, and min_n = 8 performed the best. I then selected that model and used it to fit the entire training set.
 
 ```{r}
@@ -552,9 +574,10 @@ bst_acc
 augment(bst_final_fit, new_data = uc_train) %>% 
   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
 ```
+
 The final boosted tree model had an accuracy of 0.575 and an ROC_AUC of 0.9432. Not amazing, and not as good as the random forest, but far better than any of the other options.
 
-### Best Model
+## Best Model turned Test Model
 
 Finally, it's time to pick the best model and try it on the test data - data the model has never seen. Based on both accuracy and ROC_AUC, the random forest model was the best by far.
 
@@ -565,8 +588,8 @@ rf_test_acc
 
 augment(rf_final_fit, new_data = uc_test) %>% 
   roc_auc(model, .pred_Accord:.pred_Silverado_1500) 
-
 ```
+
 When fit to the test data, the random forest model got an accuracy of 0.296 and an ROC_AUC of 0.840. This was a pretty substantial drop from the values the same random forest model got on the training set, which were 0.725 and 0.979 respectively. This suggests that despite the measures taken with k-fold cross validation, the model was overfit to the training data, and did not perform well when making predictions based on new data.
 
 To dig a little deeper, I investigated the ROC_AUC curves for each possible value of the outcome variable. Ideally, each curve would approach the top left corner, which corresponds to an ROC_AUC of 1. A poorly performing model would have a curve along x=y, which corresponds to an ROC_AUC of 0.5
@@ -580,6 +603,7 @@ augment(rf_final_fit, new_data = uc_test) %>%
 For some car models, like the Corolla and the Ford F-150, the ROC curves look pretty good. However, this is not the case in all of the graphs - The Accord, the Camry, and the Escape are all pretty far off from that top left corner. 
 
 The last thing I checked was a confusion matrix, showing the model's predictions versus the true classification. A good model should have high numbers along the diagonal, which corresponds to the prediction being equivalent to the truth, and low numbers everywhere else.
+
 ```{r}
 augment(rf_final_fit, new_data = uc_test) %>%
   conf_mat(truth = model, estimate = .pred_class) %>% 
@@ -587,13 +611,11 @@ augment(rf_final_fit, new_data = uc_test) %>%
 
 ```
 
-
-
 There is somewhat of a concentration along the diagonal, so it is clear the model was not blindly guessing. However, there are many scattered values across the board that are not insignificant. This matrix also agrees with the observations made from the ROC_AUC curves. The Corolla and the F-150 predictions seem more concentrated along the diagonal, but the Accord, the Camry, and the Escape are all over the place. 
 
 One thing that stood out to me was that the model made a lot of wrong predictions between the F-150, the Ram 1500, and the Silverado 1500 - it often chose one of these other two car models to predict the third. All three of these models are trucks, so there must be some relationship across the predictor variables that allow it to hone in on trucks in general, but struggle to make further distinctions.
 
-### Conclusion
+## Conclusion
 
 In the end, I was unable to train a machine learning model that could effectively predict a used car's model given it's price, mileage, year, and transmission. The random forest model looked hopeful based on it's accuracy and ROC_AUC wen fit to the training data, but these values both dipped significantly when the model was fit to the testing data. This is a case of overfitting, where the model picked up on random patterns unique to the training data that do not generalize well to new data. I am a little shocked at the magnitude of the drop in performance, because cross validation is supposed to address this specific issue.
 
