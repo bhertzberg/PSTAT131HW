@@ -1,0 +1,24 @@
+US used cars codebook. Reformatted from codebook provided by Rupesh Raundal on Kaggle.
+
+Field		Active Feed Format	Length	Source			Description									Available Since (year = 2020)
+id		string			36	MC Generated		This is a GUID and unique in the feed. In History feed VIN number is prefixed	Jan 15
+vin		string			17	MC Scraped		17 char long VIN of the car							Jan 15
+price		number			12	MC Scraped		The car price as listed on the website						Jan 15
+miles		number			12	MC Scraped		The car miles/odometer as listed on the website					Jan 15
+stock_no	string			32	MC Scraped		Stock number of the car listed on the website					Jan 15
+year		number			4	VIN Decoder		Model Year of the car (VIN Decoded)						Jan 15
+make		string			32	VIN Decoder		Make of the car (VIN Decoded)							Jan 15
+model		string			256	VIN Decoder		Model of the car (VIN Decoded)							Jan 15
+trim		string			256	VIN Decoder		Trim of the car (VIN Decoded)							Jan 15
+vehicle_type	string			64	VIN Decoder		Vehicle type of the car (VIN Decoded)						Jan 15
+body_type	string			64	VIN Decoder		Body type of the car (VIN Decoded)						Jan 15
+drivetrain	string			64	VIN Decoder		Drivetrain of the car (VIN Decoded)						Jan 15
+fuel_type	string			64	VIN Decoder		Fuel type of the car (VIN Decoded)						Jan 15
+engine_block	string			8	VIN Decoder		Engine block of the car (VIN Decoded)						Jan 15
+engine_size	string			16	VIN Decoder		Engine size of the car (VIN Decoded)						Jan 15
+transmission	string			32	VIN Decoder		Transmission of the car (VIN Decoded)						Jan 15
+seller_name	string			512	MC Scraped		Dealer Name									Jan 15
+street		string			512	MC Scraped		Dealer location field								Jan 15
+city		string			128	MC Scraped		Dealer location field								Jan 15
+state		string			128	MC Scraped		Dealer location field								Jan 15
+zip		string			10	MC Scraped		Dealer location field								Jan 15
