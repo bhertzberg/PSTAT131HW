@@ -338,6 +338,7 @@ The random forest model got an accuracy of 0.725 and an ROC_ACU of 0.979. Not ba
 
 ### model 3
 
+The third model is a linear support vector machine, known as an SVM. I created a workflow, prepared to tune the hyperparameter cost, and create a grid of 10 values for that hyperparameter. Then I tuned the model and saved the results.
 ```{r, eval = FALSE}
 svm_linear_spec <- svm_poly(degree = 1) %>%
   set_mode("classification") %>%
@@ -359,61 +360,41 @@ write_rds(tune_res, file = 'SavedModels/uc_svm_res.rds')
 
 ```
 
-
+I read the results from the saved file.
 ```{r}
 uc_svm_res <- read_rds(file = 'SavedModels/uc_svm_res.rds')
 
 ```
 
-
+Once again, I looked at all the best performing models.
 ```{r}
 head(collect_metrics(uc_svm_res) %>% arrange(desc(mean)))
 
 ```
 
-
+Then I selected the best linear SVM and fit it to the entire training set.
 ```{r}
 best_svm <- select_best(uc_svm_res, metric = "roc_auc")
 
 svm_final <- finalize_workflow(svm_linear_wf, best_svm)
 
 svm_final_fit1 <- fit(svm_final, data = uc_train)
+
+# svm_acc <- augment(svm_final_fit1, new_data = uc_train) %>% 
+#   accuracy(truth = model, estimate = .pred_class)
+# svm_acc
+
+# augment(svm_final_fit1, new_data = uc_train) %>% 
+#   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+
+#commented out the accuracy/ROC_AUC code because it takes a long time to run and made knitting difficult. I recorded the values in the text below.
+
 ```
+The linear SVM got an accuracy of 0.209 and an ROC_AUC of 0.753. This is worse than the most basic model. 
 
+The lectures for this course did not fully cover SVMs, so I couldn't analyze this result as well as I would have liked to. However, my best guess was that I used a linear SVM to try and model a non linear relationship, so I took another crack at it with a polynomial SVM. Ideally, I would have set the hyperparameter 'degree' to be tuned, but something about training the SVMs took an extremely long time, and my computer would not have been able to handle it. So I left 'cost' as the only hyperparameter to be tuned, and specified degree to be 4 (as opposed to 1, which was its value for the linear case). I chose 4 because there are four predictors in the recipe, but without more time to learn about SVMs in class, this choice was rather arbitrary.
 
-```{r}
-svm_acc <- augment(svm_final_fit1, new_data = uc_train) %>% 
-  accuracy(truth = model, estimate = .pred_class)
-svm_acc
-
-augment(svm_final_fit1, new_data = uc_train) %>% 
-  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
-
-```
-
-try radial svm
-
-```{r}
-svm_rbf_spec <- svm_rbf() %>%
-  set_mode("classification") %>%
-  set_engine("kernlab")
-```
-
-```{r}
-svm_rbf_fit <- svm_rbf_spec %>%
-  fit(model ~ price + miles + year +transmission, data = uc_train)
-```
-
-```{r}
-svm_rad_acc <- augment(svm_rbf_fit, new_data = uc_train) %>% 
-  accuracy(truth = model, estimate = .pred_class)
-svm_rad_acc
-
-augment(svm_rbf_fit, new_data = uc_train) %>% 
-  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
-```
-
-
+The process is the same as for the linear case, with degree set to equal 4 instead of 1.
 ```{r, eval = FALSE}
 svm_poly_spec <- svm_poly() %>%
   set_mode("classification") %>%
@@ -435,55 +416,73 @@ write_rds(svm_poly_tune_res, file = 'SavedModels/uc_svm_poly_res.rds')
 
 ```
 
-
+I read in the saved data for the tuned polynomial SVMs
 ```{r}
 uc_svm_poly_res <- read_rds(file = 'SavedModels/uc_svm_poly_res.rds')
 
 ```
 
-
-```{r}
-collect_metrics(uc_svm_poly_res) %>% arrange(desc(mean))
-
-```
-
-
+I chose the best polynomial SVM based on ROC_AUC.
 ```{r}
 best_poly_svm <- select_best(uc_svm_poly_res, metric = "roc_auc")
 
 poly_svm_final <- finalize_workflow(svm_linear_wf, best_poly_svm)
 
 poly_svm_final_fit1 <- fit(poly_svm_final, data = uc_train)
-```
 
+# poly_svm_acc <- augment(poly_svm_final_fit1, new_data = uc_train) %>% 
+#   accuracy(truth = model, estimate = .pred_class)
+# poly_svm_acc
+# 
+# augment(poly_svm_final_fit1, new_data = uc_train) %>% 
+#   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+
+#commented out the accuracy/ROC_AUC code because it takes a long time to run and made knitting difficult. I recorded the values in the text below.
+```
+The polynomial SVM got an accuracy of 0.262 and an ROC_AUC of 0.751. Barely better accuracy than the basic model, and slightly worse ROC_AUC than the basic model.
+
+Changing the 'degree' value to 4 did not make much of a difference. Without the clearest understanding of SVMs, I was unable to figure out why this was the case. However, while researching and preparing these two SVM models, I saw that radial SVMs might be a better bet for non linear data. I decided against tuning dozens of radial SVMs with cross validation, but figured I would take a crack at one just to see what would happen. 
+
+I prepared a radial SVM and fit it to the entire training set. Although I was only training the one model and it was not too time intensive, I saved the model to a separate file to speed things up just slightly in the future.
+```{r, eval = FALSE}
+svm_rbf_spec <- svm_rbf() %>%
+  set_mode("classification") %>%
+  set_engine("kernlab")
+
+svm_rbf_fit <- svm_rbf_spec %>%
+  fit(model ~ price + miles + year +transmission, data = uc_train)
+```
 
 ```{r}
-poly_svm_acc <- augment(poly_svm_final_fit1, new_data = uc_train) %>% 
-  accuracy(truth = model, estimate = .pred_class)
-poly_svm_acc
+write_rds(svm_rbf_fit, file = 'SavedModels/uc_svm_radial_res.rds')
 ```
 
+I read in the saved data for the radial SVM.
 ```{r}
-augment(poly_svm_final_fit1, new_data = uc_train) %>% 
-  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+uc_svm_rad_res <- read_rds(file = 'SavedModels/uc_svm_radial_res.rds')
 
-augment(poly_svm_final_fit1, new_data = uc_train) %>%
-  roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
-  autoplot()
-
-augment(poly_svm_final_fit1, new_data = uc_train) %>%
-  conf_mat(truth = model, estimate = .pred_class) %>% 
-  autoplot(type = 'heatmap') 
 ```
+
+The moment of SVM truth:
+```{r}
+# svm_rad_acc <- augment(uc_svm_rad_res, new_data = uc_train) %>% 
+#   accuracy(truth = model, estimate = .pred_class)
+# svm_rad_acc
+# 
+# augment(uc_svm_rad_res, new_data = uc_train) %>% 
+#   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+
+#commented out the accuracy/ROC_AUC code because it takes a long time to run and made knitting difficult. I recorded the values in the text below.
+
+```
+The radial SVM got an accuracy of 0.327 and an ROC_AUC of 0.745. Slightly better accuracy than the basic model and the other SVMs, but slightly worse ROC_AUC those models too.
+
+At this point I was quite fed up with SVMs and decided to move on.
+
 
 ### Model 4
-```{r}
-boost_spec <- boost_tree(trees = 5000, tree_depth = 4) %>%
-  set_engine("xgboost") %>%
-  set_mode("regression")
-```
 
-
+The last type of model I used was a boosted tree. I set up a boosted tree specification to be used in the workflow. The hyperparameters to be tuned were mtry, trees, and min_n, just like in the random forest models.
 ```{r}
 boost_spec <- boost_tree(mtry = tune(), trees = tune(), min_n = tune()) %>%
   set_engine("xgboost") %>%
@@ -494,11 +493,12 @@ bst_wf <- workflow() %>%
   add_recipe(uc_rec)
 ```
 
+In this case, I decided to increase the range of 'trees' to go up to 1000 (compared to the random forest tuningwhich went up to 300). These larger models would take longer to train, so I reduced the number of levels from 8 to 4 to reduce time consumption. This time around, I would only be training 4*4*4*5 = 320 models.
 ```{r}
 bst_grid <- grid_regular(mtry(range = c(1,4)), trees(range = c(10, 1000)), min_n(range = c(2,12)), levels = 4)
 ```
 
-
+I tuned the parameters across all the folds and saved the results.
 ```{r, eval=FALSE}
 bst_res <- tune_grid(
   bst_wf,
@@ -509,16 +509,18 @@ bst_res <- tune_grid(
 write_rds(bst_res, file = 'SavedModels/uc_bst_tuned_res.rds')
 ```
 
+Then I read the results back in.
 ```{r}
 uc_boosted_res <- read_rds(file = 'SavedModels/uc_bst_tuned_res.rds')
 
 ```
 
-
+The best models according to ROC_AUC are listed below.
 ```{r}
-collect_metrics(uc_boosted_res) %>% arrange(desc(mean))
+head(collect_metrics(uc_boosted_res) %>% arrange(desc(mean)))
 
 ```
+It looks like the model with mtry = 1, trees = 340, and min_n = 8 performed the best. I then selected that model and used it to fit the entire training set.
 
 ```{r}
 best_bst <- select_best(uc_boosted_res, metric = "roc_auc")
@@ -526,39 +528,28 @@ best_bst <- select_best(uc_boosted_res, metric = "roc_auc")
 bst_final <- finalize_workflow(bst_wf, best_bst)
 
 bst_final_fit <- fit(bst_final, data = uc_train)
-```
 
-
-```{r}
 bst_acc <- augment(bst_final_fit, new_data = uc_train) %>% 
   accuracy(truth = model, estimate = .pred_class)
 bst_acc
-```
 
-```{r}
 augment(bst_final_fit, new_data = uc_train) %>% 
   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
-
-augment(bst_final_fit, new_data = uc_train) %>%
-  roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
-  autoplot()
-
-augment(bst_final_fit, new_data = uc_train) %>%
-  conf_mat(truth = model, estimate = .pred_class) %>% 
-  autoplot(type = 'heatmap') 
 ```
+The final boosted tree model had an accuracy of 0.575 and an ROC_AUC of 0.9432. Not amazing, and not as good as the random forest, but far better than any of the other options.
 
 ### Best Model
-```{r}
+Finally, it's time to pick the best model and try it on the test data - data the model has never seen. Based on both accuracy and ROC_AUC, the random forest model was the best by far.
 
-augment(reg_tree_final_fit1, new_data = uc_train) %>% 
+```{r}
+augment(reg_tree_final_fit1, new_data = uc_test) %>% 
   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
 
-augment(reg_tree_final_fit1, new_data = uc_train) %>%
+augment(reg_tree_final_fit1, new_data = uc_test) %>%
   roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
   autoplot()
 
-augment(reg_tree_final_fit1, new_data = uc_train) %>%
+augment(reg_tree_final_fit1, new_data = uc_test) %>%
   conf_mat(truth = model, estimate = .pred_class) %>% 
   autoplot(type = 'heatmap') 
 ```
