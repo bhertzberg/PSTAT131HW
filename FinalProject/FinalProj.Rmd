@@ -40,6 +40,8 @@ My models were trained on used car data taken from a Kaggle dataset provided by 
 
 https://www.kaggle.com/datasets/3ea0a6a45dbd4713a8759988845f1a58038036d84515ded58f65a2ff2bd32e00?resource=download&select=us-dealers-used.csv
 
+*This file, and the folder it is contained in, are not in my github repo due to the file size.
+
 Raundal provided a dataset for the US, as well as one for Canada, but I only used the US file. I read in the data, and cleaned up the variable names from the data set so they all follow snake case (no capitalization and words separated by underlines, which_looks_like_this).
 
 ```{r, eval = FALSE}
@@ -139,7 +141,7 @@ There is a slight positive correlation between engine size and miles, and a slig
 
 
 Finally, I took a look at how price and car model are related by plotting the counts for each car model in separate histograms. I set the range of prices to be from $0 to $80,000. Each histogram has 10 bins, each of which has a range of $8,000. 
-```{r}
+```{r, warning=FALSE}
 ggplot(common_models, aes(price)) +
   geom_histogram(bins = 10, color = "white") +
   facet_wrap(~model, scales = "free_y") +
