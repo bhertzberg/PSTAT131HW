@@ -48,7 +48,7 @@ used_cars <- clean_names(used_cars)
 ```
 Importing the data was easier said than done - the file on US used cars was over 1.28 gigabytes and contained millions of data points. I had to immediately subset the data to prevent errors regarding memory allocation. I took a random sample of 50,000 cars to start off with. Prior to this, I set a random seed value, which allows the randomly chosen sample to be reproduced.
 
-With the data in a more manageable size, I filled all blank spaces with 'NA', which lets R know that there is no data contained. Then I removed all observations containing 'NA'.
+With the data in a more manageable size, I filled all blank spaces with 'NA', which lets R know that there is no data contained. Then I removed all observations containing 'NA'. After passing through this filter, the data set contained 43,551 observations.
 ```{r, eval = FALSE}
 set.seed(619)
 uc_subset<- sample_n(used_cars, size = 50000)
@@ -94,7 +94,9 @@ uc_clean$year <- as.numeric(uc_clean$year)
 
 
 
-### Graphs
+### Exploring the Data
+
+The next step was taking a look at the data to get a better idea of what I was working with. I first wanted to know what the spread of my outcome variable, car model, looked like.
 
 ```{r}
 model_plot<-ggplot(uc_clean, aes(y = model)) + 
@@ -102,14 +104,17 @@ model_plot<-ggplot(uc_clean, aes(y = model)) +
 model_plot
 ```
 
+Yikes! The first thing you might notice is the jumble of model names attempting to serve as labels on the y-axis. But before I tried to fix this, I focused on the data displayed and saw that the majority of models contained very few data points. Statistical models tend to perform poorly if there is not an adequate amount of data, so I decided the best thing to do was limit my models to vehicles that appeared at least 500 times in the data set.
 
 ```{r}
-model_counts <- table(uc_clean$model)
+model_counts <- table(uc_train$model)
 
 common_models <- subset(uc_clean, model %in% names(model_counts[model_counts > 500]))
 common_models<-droplevels(common_models)
 
 ```
+
+I saved these more popular vehicles in a data set called 'common_models', which contains 11,910 observations. Lets see what the spread of the car models looks like now.
 
 ```{r}
 type_1_plot<-ggplot(common_models, aes(y = model)) + 
@@ -117,8 +122,12 @@ type_1_plot<-ggplot(common_models, aes(y = model)) +
 type_1_plot
 ```
 
+Much better.
 
 ### Splitting
+
+Before I explored my data further, I decided it was time to make the split between 
+
 ```{r}
 set.seed(619)
 uc_split <- initial_split(common_models, prop = 0.80, strata = model, pool = 0.01)
@@ -126,6 +135,7 @@ uc_train <- training(uc_split)
 uc_test <- testing(uc_split)
 ```
 
+I chose to put 80% of the data into the training set and left the remaining 20% for the test set. The training set will be used to train all of the machine learning algorithms. It is necessary to keep a separate testing set to see how well a model performs on data that it has never seen before. The test set will only be used to check how well my best model. Until then, I will have no interaction with the test set to ensure model integrity. This means all of my initial exploring will be done on the training set.
 
 
 ```{r}
@@ -150,7 +160,7 @@ uc_folds <- vfold_cv(uc_train, v = 5, strata = model)
 uc_folds
 ```
 
-### First Model 
+### Basic 
 
 ```{r}
 uc_rec <- recipe(model ~ price + miles + year +transmission, data = uc_train) %>% 
