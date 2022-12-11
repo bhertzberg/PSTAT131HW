@@ -137,6 +137,20 @@ There is a very strong negative correlation between year and miles. This means n
 
 There is a slight positive correlation between engine size and miles, and a slight negative correlation between engine size and year. These relationships are harder to explain. The first one is a mystery to me. As far as the second relationship, my best guess would be that cars have gotten smaller and more fuel efficient in recent years, which might mean engine sizes have decreased.
 
+
+Finally, I took a look at how price and car model are related by plotting the counts for each car model in separate histograms. I set the range of prices to be from $0 to $80,000. Each histogram has 10 bins, each of which has a range of $8,000. 
+```{r}
+ggplot(common_models, aes(price)) +
+  geom_histogram(bins = 10, color = "white") +
+  facet_wrap(~model, scales = "free_y") +
+  xlim(0, 80000)+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) + 
+  labs(
+    title = "Histogram of Model Counts based on Price"
+  )
+```
+The histograms for the Accord, CR-V, and Grand Cherokee are clearly skewed left. The histograms for the Civic, Equinox, Escape, F-150, Ram 1500, and Silverado are approximately normal. The other car models don't follow as clear distributions, but most are more or less normal or slighlty skewed left. The Explorer, the F-150, the Ram 1500, and the Silverado appear to have the widest range of prices, and are the only models that approach or surpass the $60,000 bin.
+
 ### Splitting
 
 The last thing standing between me and model training was splitting the data. I set my random seed to be able to reproduce the same split in the future, and divided my data in what is called the initial split.
@@ -319,18 +333,18 @@ Then I selected the best random forest model, fit it to a new workflow, and fit 
 ```{r}
 best_rf1 <- select_best(uc_rf_res, metric = "roc_auc")
 
-reg_tree_final1 <- finalize_workflow(rf_wf, best_rf1)
+rf_final1 <- finalize_workflow(rf_wf, best_rf1)
 
-reg_tree_final_fit1 <- fit(reg_tree_final1, data = uc_train)
+rf_final_fit <- fit(rf_final1, data = uc_train)
 ```
 
 Time to check the model on the training set.
 ```{r}
-rf_acc <- augment(reg_tree_final_fit1, new_data = uc_train) %>% 
+rf_acc <- augment(rf_final_fit, new_data = uc_train) %>% 
   accuracy(truth = model, estimate = .pred_class)
 rf_acc
 
-augment(reg_tree_final_fit1, new_data = uc_train) %>% 
+augment(rf_final_fit, new_data = uc_train) %>% 
   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
 
 ```
@@ -493,7 +507,7 @@ bst_wf <- workflow() %>%
   add_recipe(uc_rec)
 ```
 
-In this case, I decided to increase the range of 'trees' to go up to 1000 (compared to the random forest tuningwhich went up to 300). These larger models would take longer to train, so I reduced the number of levels from 8 to 4 to reduce time consumption. This time around, I would only be training 4*4*4*5 = 320 models.
+In this case, I decided to increase the range of 'trees' to go up to 1000 (compared to the random forest tuning which went up to 300). These larger models would take longer to train, so I reduced the number of levels from 8 to 4 to reduce time consumption. This time around, I would only be training 4*4*4*5 = 320 models.
 ```{r}
 bst_grid <- grid_regular(mtry(range = c(1,4)), trees(range = c(10, 1000)), min_n(range = c(2,12)), levels = 4)
 ```
@@ -543,11 +557,11 @@ The final boosted tree model had an accuracy of 0.575 and an ROC_AUC of 0.9432. 
 Finally, it's time to pick the best model and try it on the test data - data the model has never seen. Based on both accuracy and ROC_AUC, the random forest model was the best by far.
 
 ```{r}
-rf_test_acc <- augment(reg_tree_final_fit1, new_data = uc_test) %>% 
+rf_test_acc <- augment(rf_final_fit, new_data = uc_test) %>% 
   accuracy(truth = model, estimate = .pred_class)
 rf_test_acc
 
-augment(reg_tree_final_fit1, new_data = uc_test) %>% 
+augment(rf_final_fit, new_data = uc_test) %>% 
   roc_auc(model, .pred_Accord:.pred_Silverado_1500) 
 
 ```
@@ -556,7 +570,7 @@ When fit to the test data, the random forest model got an accuracy of 0.296 and 
 To dig a little deeper, I investigated the ROC_AUC curves for each possible value of the outcome variable. Ideally, each curve would approach the top left corner, which corresponds to an ROC_AUC of 1. A poorly performing model would have a curve along x=y, which corresponds to an ROC_AUC of 0.5
 
 ```{r}
-augment(reg_tree_final_fit1, new_data = uc_test) %>%
+augment(rf_final_fit, new_data = uc_test) %>%
   roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
   autoplot() + theme(axis.text.x = element_text(angle = 60, hjust = 1))
 ```
@@ -565,7 +579,7 @@ For some car models, like the Corolla and the Ford F-150, the ROC curves look pr
 
 The last thing I checked was a confusion matrix, showing the model's predictions versus the true classification. A good model should have high numbers along the diagonal, which corresponds to the prediction being equivalent to the truth, and low numbers everywhere else.
 ```{r}
-augment(reg_tree_final_fit1, new_data = uc_test) %>%
+augment(rf_final_fit, new_data = uc_test) %>%
   conf_mat(truth = model, estimate = .pred_class) %>% 
   autoplot(type = 'heatmap') + theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
@@ -575,5 +589,10 @@ augment(reg_tree_final_fit1, new_data = uc_test) %>%
 
 There is somewhat of a concentration along the diagonal, so it is clear the model was not blindly guessing. However, there are many scattered values across the board that are not insignificant. This matrix also agrees with the observations made from the ROC_AUC curves. The Corolla and the F-150 predictions seem more concentrated along the diagonal, but the Accord, the Camry, and the Escape are all over the place. 
 
-One thing that stood out to me was that the model made a lot of wrong predictions between the F-150, the Ram 1500, and the Silverado 1500 - it often chose one of these other two car models to predict the third. All three of these models are trucks, so there must be some relatioship across the predictor variables that allow it to hone in on trucks in general, but struggle to make further distinctions.
+One thing that stood out to me was that the model made a lot of wrong predictions between the F-150, the Ram 1500, and the Silverado 1500 - it often chose one of these other two car models to predict the third. All three of these models are trucks, so there must be some relationship across the predictor variables that allow it to hone in on trucks in general, but struggle to make further distinctions.
 
+### Conclusion
+
+In the end, I was unable to train a machine learning model that could effectively predict a used car's model given it's price, mileage, year, and transmission. The random forest model looked hopeful based on it's accuracy and ROC_AUC wen fit to the training data, but these values both dipped significantly when the model was fit to the testing data. This is a case of overfitting, where the model picked up on random patterns unique to the training data that do not generalize well to new data. I am a little shocked at the magnitude of the drop in performance, because cross validation is supposed to address this specific issue.
+
+I am a bit disappointed, because I wanted to come away with a model that could effectively make predictions based on relationships that were not readily apparent. If I were to do this project over, I would try to incorporate more predictor variables in the recipe. I would also try to execute cross validation with more folds, to reduce the chance of overfitting.
