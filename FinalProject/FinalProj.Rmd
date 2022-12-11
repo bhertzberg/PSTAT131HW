@@ -139,7 +139,7 @@ There is a slight positive correlation between engine size and miles, and a slig
 
 ### Splitting
 
-The last thing standing between me and model training is splitting the data. I set my random seed to be able to reproduce the same split in the future, and divided my data in what is called the initial split.
+The last thing standing between me and model training was splitting the data. I set my random seed to be able to reproduce the same split in the future, and divided my data in what is called the initial split.
 
 ```{r}
 set.seed(619)
@@ -148,7 +148,7 @@ uc_train <- training(uc_split)
 uc_test <- testing(uc_split)
 ```
 
-I chose to put 80% of the data into the training set and left the remaining 20% for the test set. I stratified the split on the outcome variable, model - this ensures that there will be a proportional amount of observations for every possible outcome in both sets. That way, even if there are models with fewer counts, they won't get accidentally overlooked during random split. 
+I chose to put 80% of the data into the training set and left the remaining 20% for the test set. I stratified the split on the outcome variable, model - this ensures that there are proportional amount of observations for every possible outcome in both sets. That way, even if there are models with fewer counts, they won't get accidentally overlooked during random split. 
 The training set will be used to train all of the machine learning algorithms. It is necessary to have a separate testing set to see how well a model performs on data that it has never seen before. This is done to check for overfitting, where a model will specialize in predicting with the data it was trained on, but do a poor job making predictions with new data. The test set will only be used to check how well my best model performs. Until then, I will have no interaction with the test set to maintain model integrity.
 
 That being said, it is almost always a good idea to test a model as you are working on it so you can tweak it and make improvements. How do you do that if you can't touch the test set? Split the training set once again!
@@ -178,6 +178,9 @@ uc_rec <- recipe(model ~ price + miles + year +transmission, data = uc_train) %>
 ```
 
 
+#### Basic Model
+
+Before I took a crack at training a more complicated ML model, I wanted to see how effective a very simple model would be. I decided to use Linear Discriminant Analysis, one of the most basic ways to make predictions in a classification problem with multiple possible outcomes. I trained it using the entire training set, because I was not planning on making any adjustments to this first model.
 
 ```{r}
 lda_mod <- discrim_linear() %>% 
@@ -191,6 +194,7 @@ lda_wkflow <- workflow() %>%
 lda_fit <- fit(lda_wkflow, uc_train)
 ```
 
+I set up the model using a linear discriminant workflow, added my recipe, and fit it to the entire training set.
 
 ```{r}
 lda_acc <- augment(lda_fit, new_data = uc_train) %>% 
@@ -201,10 +205,14 @@ augment(lda_fit, new_data = uc_train) %>%
   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
 ```
 
+I checked two measures of model success, which are accuracy and ROC_AUC. Accuracy ranges from 0 (bad) to 1 (good), and ROC_AUC effectively ranges from 0.5 (bad) to 1 (good). This basic model had an accuracy of 0.245 and an ROC_AUC of 0.798 - not so good, as expected. Let's see if more complex models will do a better job.
 
 
 ### First Model
 
+Ok, time for the first serious model. I chose to use an elastic net, which is a linear combination of lasso and ridge regularization. These methods use a penalty value to decrease the variance of the ML model's prediction. Elastic net combines the two into a single model, and chooses the weight of each with the mixture value.
+
+First, I created the elastic net model and set the penalty and mixture values equal to tune(). This allowed me to specify a range of possible values for those inputs. Every possible combination of those inputs are tried during training (and repeated across 5 different folds due to cross validation). This makes for some looooong training times, but the result can be a very effective model.
 ```{r}
 net_mod <- 
   multinom_reg(penalty = tune(), mixture = tune()) %>% 
@@ -215,14 +223,13 @@ net_wkflw <- workflow() %>%
   add_recipe(uc_rec) %>% 
   add_model(net_mod)
 ```
-
-
+ 
+Here I created a grid of possible ranges for the penalty and mixture inputs, and specified that I want 10 levels (equally spaced out values) chosen from those ranges. 
 ```{r}
 net_grid <- grid_regular(penalty(range = c(-5, 5)), mixture(range = c(0,1)), levels = 10)
-net_grid
-
 ```
 
+Finally, it's time to train a model using cross validation and tuning. In this case, I have 10 levels of 'penalty', 10 levels of 'mixture', and 5 folds, which means 10*10*5 = 500 models are about to get trained! As I said before, cross validation and tuning can take a long time, and this is the reason why. To avoid spending that time in the future, I saved the ML models to a separate file, where I can import the results directly rather than train them all again.
 ```{r, eval = FALSE}
 elastic_tune_res <-tune_grid(
   net_wkflw,
@@ -235,45 +242,42 @@ write_rds(elastic_tune_res, file = 'SavedModels/uc_elastic_res.rds')
 
 ```
 
+Now that I saved the elastic net models, I simply read them in as shown below.
 ```{r}
 uc_elastic_res <- read_rds(file = 'SavedModels/uc_elastic_res.rds')
 
 ```
 
+I then viewed a table to see how the best elastic net models performed, based on their ROC_AUC.
 ```{r}
-collect_metrics(uc_elastic_res) %>% arrange(desc(mean))
+head(collect_metrics(uc_elastic_res) %>% arrange(desc(mean)))
 
 ```
 
+I selected the best elastic net model, added it to a new, finalized workflow, and fit it to the entire training set.
 ```{r}
 best_elastic_mod <- select_best(uc_elastic_res, metric = 'roc_auc')
 uc_elastic_final <- finalize_workflow(net_wkflw, best_elastic_mod)
 uc_elastic_final_fit <- fit(uc_elastic_final, data = uc_train)
 ```
 
-
-```{r}
-augment(uc_elastic_final_fit, new_data = uc_train) %>% 
-  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
-
-augment(uc_elastic_final_fit, new_data = uc_train) %>%
-  roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
-  autoplot()
-
-augment(uc_elastic_final_fit, new_data = uc_train) %>%
-  conf_mat(truth = model, estimate = .pred_class) %>% 
-  autoplot(type = 'heatmap') 
-```
-
+Then I checked final elastic net model's performance on the training data.
 ```{r}
 elastic_acc <- augment(uc_elastic_final_fit, new_data = uc_train) %>% 
   accuracy(truth = model, estimate = .pred_class)
 elastic_acc
-```
 
+augment(uc_elastic_final_fit, new_data = uc_train) %>% 
+  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+```
+Accuracy: 0.281
+ROC_AUC: 0.820
+
+Still not good. But both measures are higher than the basic model, so things are heading in the right direction.
 
 ### second model
 
+Up next is a random forest model. This is a very popular ML model, and I expected it to be the most effective for my purpose. Below, I set up a random forest workflow, and prepare to tune three hyperparameters: mtry, trees, and min_n.
 ```{r}
 rf_spec <- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %>% 
   set_engine('ranger', importance = 'impurity') %>% 
@@ -285,11 +289,12 @@ rf_wf <- workflow() %>%
   add_recipe(uc_rec)
 ```
 
+For tuning, I set up another grid specifying the ranges of each hyperparameter and the number of levels. With 3 hyperparameters, 8 levels, and 5 folds, there will be 8*8*8*5 = 2560 models trained!
 ```{r}
 reg_grid <- grid_regular(mtry(range = c(1,4)), trees(range = c(10, 300)), min_n(range = c(2,12)), levels = 8)
 ```
 
-
+I tuned the model and saved the results so I wouldn't have to repeat the training process.
 ```{r, eval=FALSE}
 rf_res <- tune_grid(
   rf_wf,
@@ -299,18 +304,18 @@ rf_res <- tune_grid(
 
 write_rds(rf_res, file = 'SavedModels/uc_rf_tuned_res1.rds')
 ```
-
+Then I read in the results.
 ```{r}
 uc_rf_res <- read_rds(file = 'SavedModels/uc_rf_tuned_res1.rds')
 
 ```
 
-
+Once again, I took a peak at the best performing models.
 ```{r}
 collect_metrics(uc_rf_res) %>% arrange(desc(mean))
 ```
 
-
+Then I selected the best random forest model, fit it to a new workflow, and fit it to the entire training set.
 ```{r}
 best_rf1 <- select_best(uc_rf_res, metric = "roc_auc")
 
@@ -319,26 +324,17 @@ reg_tree_final1 <- finalize_workflow(rf_wf, best_rf1)
 reg_tree_final_fit1 <- fit(reg_tree_final1, data = uc_train)
 ```
 
-
-```{r}
-augment(reg_tree_final_fit1, new_data = uc_train) %>% 
-  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
-
-augment(reg_tree_final_fit1, new_data = uc_train) %>%
-  roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
-  autoplot()
-
-augment(reg_tree_final_fit1, new_data = uc_train) %>%
-  conf_mat(truth = model, estimate = .pred_class) %>% 
-  autoplot(type = 'heatmap') 
-```
-
+Time to check the model on the training set.
 ```{r}
 rf_acc <- augment(reg_tree_final_fit1, new_data = uc_train) %>% 
   accuracy(truth = model, estimate = .pred_class)
 rf_acc
-```
 
+augment(reg_tree_final_fit1, new_data = uc_train) %>% 
+  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+
+```
+The random forest model got an accuracy of 0.725 and an ROC_ACU of 0.979. Not bad at all!
 
 ### model 3
 
@@ -371,7 +367,7 @@ uc_svm_res <- read_rds(file = 'SavedModels/uc_svm_res.rds')
 
 
 ```{r}
-collect_metrics(uc_svm_res) %>% arrange(desc(mean))
+head(collect_metrics(uc_svm_res) %>% arrange(desc(mean)))
 
 ```
 
@@ -389,20 +385,10 @@ svm_final_fit1 <- fit(svm_final, data = uc_train)
 svm_acc <- augment(svm_final_fit1, new_data = uc_train) %>% 
   accuracy(truth = model, estimate = .pred_class)
 svm_acc
-```
 
-
-```{r}
 augment(svm_final_fit1, new_data = uc_train) %>% 
   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
 
-augment(svm_final_fit1, new_data = uc_train) %>%
-  roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
-  autoplot()
-
-augment(svm_final_fit1, new_data = uc_train) %>%
-  conf_mat(truth = model, estimate = .pred_class) %>% 
-  autoplot(type = 'heatmap') 
 ```
 
 try radial svm
@@ -422,20 +408,9 @@ svm_rbf_fit <- svm_rbf_spec %>%
 svm_rad_acc <- augment(svm_rbf_fit, new_data = uc_train) %>% 
   accuracy(truth = model, estimate = .pred_class)
 svm_rad_acc
-```
 
-
-```{r}
 augment(svm_rbf_fit, new_data = uc_train) %>% 
   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
-
-augment(svm_rbf_fit, new_data = uc_train) %>%
-  roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
-  autoplot()
-
-augment(svm_rbf_fit, new_data = uc_train) %>%
-  conf_mat(truth = model, estimate = .pred_class) %>% 
-  autoplot(type = 'heatmap') 
 ```
 
 
@@ -569,6 +544,21 @@ augment(bst_final_fit, new_data = uc_train) %>%
   autoplot()
 
 augment(bst_final_fit, new_data = uc_train) %>%
+  conf_mat(truth = model, estimate = .pred_class) %>% 
+  autoplot(type = 'heatmap') 
+```
+
+### Best Model
+```{r}
+
+augment(reg_tree_final_fit1, new_data = uc_train) %>% 
+  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+
+augment(reg_tree_final_fit1, new_data = uc_train) %>%
+  roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
+  autoplot()
+
+augment(reg_tree_final_fit1, new_data = uc_train) %>%
   conf_mat(truth = model, estimate = .pred_class) %>% 
   autoplot(type = 'heatmap') 
 ```
