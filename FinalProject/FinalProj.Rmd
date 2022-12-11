@@ -2,8 +2,9 @@
 title: "FinalProject"
 author: "Ben Hertzberg"
 date: "2022-11-28"
-output: pdf_document:
-  code_folding: hide
+output: 
+  html_document:
+    code_folding: hide
 ---
 
 ```{r setup, include=FALSE}
@@ -114,7 +115,7 @@ model_plot
 Yikes! The first thing you might notice is the jumble of model names attempting to serve as labels on the y-axis. But before I tried to fix this, I focused on the data displayed and saw that the majority of models contained very few data points. Statistical models tend to perform poorly if there is not an adequate amount of data, so I decided the best thing to do was limit my models to vehicles that appeared at least 500 times in the data set.
 
 ```{r}
-model_counts <- table(uc_train$model)
+model_counts <- table(uc_clean$model)
 
 common_models <- subset(uc_clean, model %in% names(model_counts[model_counts > 500]))
 common_models<-droplevels(common_models)
@@ -371,7 +372,7 @@ The random forest model got an accuracy of 0.725 and an ROC_ACU of 0.979. Not ba
 
 The third model is a linear support vector machine, known as an SVM. I created a workflow, prepared to tune the hyperparameter cost, and create a grid of 10 values for that hyperparameter. Then I tuned the model and saved the results.
 
-```{r, eval = FALSE}
+```{r}
 svm_linear_spec <- svm_poly(degree = 1) %>%
   set_mode("classification") %>%
   set_engine("kernlab", scaled = FALSE)
@@ -381,7 +382,9 @@ svm_linear_wf <- workflow() %>%
   add_recipe(uc_rec)
 
 svm_param_grid <- grid_regular(cost(), levels = 10)
+```
 
+```{r, eval = FALSE}
 tune_res <- tune_grid(
   svm_linear_wf, 
   resamples = uc_folds, 
@@ -403,23 +406,33 @@ Once again, I looked at all the best performing models.
 head(collect_metrics(uc_svm_res) %>% arrange(desc(mean)))
 ```
 
-Then I selected the best linear SVM and fit it to the entire training set.
+Then I selected the best linear SVM and fit it to the entire training set. Something about these SVMs really took a long time, so I saved the final fit to be read in.
 
-```{r}
+```{r, eval=FALSE}
 best_svm <- select_best(uc_svm_res, metric = "roc_auc")
 
 svm_final <- finalize_workflow(svm_linear_wf, best_svm)
 
 svm_final_fit1 <- fit(svm_final, data = uc_train)
 
-# svm_acc <- augment(svm_final_fit1, new_data = uc_train) %>% 
-#   accuracy(truth = model, estimate = .pred_class)
-# svm_acc
+write_rds(svm_final_fit1, file = 'SavedModels/uc_svm_final_fit.rds')
+```
 
-# augment(svm_final_fit1, new_data = uc_train) %>% 
-#   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+```{r}
+lin_svm_final_fit_res<- read_rds(file = 'SavedModels/uc_svm_final_fit.rds')
+```
 
-#commented out the accuracy/ROC_AUC code because it takes a long time to run and made knitting difficult. I recorded the values in the text below.
+I did not run the accuracy/ROC_AUC code for any of the SVM models in my knitted file because it took a long time to run and made knitting difficult. I recorded the values in the text below.
+
+```{r, eval = FALSE}
+svm_acc <- augment(lin_svm_final_fit_res, new_data = uc_train) %>%
+  accuracy(truth = model, estimate = .pred_class)
+svm_acc
+
+augment(lin_svm_final_fit_res, new_data = uc_train) %>%
+  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+
+#I do not run this code in the knitted document to save time. The resulting values are recorded below.
 ```
 
 The linear SVM got an accuracy of 0.209 and an ROC_AUC of 0.753. This is worse than the most basic model. 
@@ -428,7 +441,7 @@ The lectures for this course did not fully cover SVMs, so I couldn't analyze thi
 
 The process is the same as for the linear case, with degree set to equal 4 instead of 1.
 
-```{r, eval = FALSE}
+```{r}
 svm_poly_spec <- svm_poly() %>%
   set_mode("classification") %>%
   set_engine("kernlab", scaled = FALSE)
@@ -438,7 +451,9 @@ svm_poly_wf <- workflow() %>%
   add_recipe(uc_rec)
 
 svm_poly_param_grid <- grid_regular(cost(), levels = 10)
+```
 
+```{r, eval = FALSE}
 svm_poly_tune_res <- tune_grid(
   svm_poly_wf, 
   resamples = uc_folds, 
@@ -456,21 +471,29 @@ uc_svm_poly_res <- read_rds(file = 'SavedModels/uc_svm_poly_res.rds')
 
 I chose the best polynomial SVM based on ROC_AUC.
 
-```{r}
+```{r, eval = FALSE}
 best_poly_svm <- select_best(uc_svm_poly_res, metric = "roc_auc")
 
 poly_svm_final <- finalize_workflow(svm_linear_wf, best_poly_svm)
 
 poly_svm_final_fit1 <- fit(poly_svm_final, data = uc_train)
 
-# poly_svm_acc <- augment(poly_svm_final_fit1, new_data = uc_train) %>% 
-#   accuracy(truth = model, estimate = .pred_class)
-# poly_svm_acc
-# 
-# augment(poly_svm_final_fit1, new_data = uc_train) %>% 
-#   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+write_rds(poly_svm_final_fit1, file = 'SavedModels/uc_poly_svm_final_fit.rds')
+```
 
-#commented out the accuracy/ROC_AUC code because it takes a long time to run and made knitting difficult. I recorded the values in the text below.
+```{r}
+poly_svm_final_fit_res<- read_rds(file = 'SavedModels/uc_poly_svm_final_fit.rds')
+```
+
+```{r, eval = FALSE}
+poly_svm_acc <- augment(poly_svm_final_fit_res, new_data = uc_train) %>%
+  accuracy(truth = model, estimate = .pred_class)
+poly_svm_acc
+
+augment(poly_svm_final_fit_res, new_data = uc_train) %>%
+  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+
+#I do not run this code in the knitted document to save time. The resulting values are recorded below.
 ```
 
 The polynomial SVM got an accuracy of 0.262 and an ROC_AUC of 0.751. Barely better accuracy than the basic model, and slightly worse ROC_AUC than the basic model.
@@ -498,16 +521,15 @@ uc_svm_rad_res <- read_rds(file = 'SavedModels/uc_svm_radial_res.rds')
 
 The moment of SVM truth:
 
-```{r}
-# svm_rad_acc <- augment(uc_svm_rad_res, new_data = uc_train) %>% 
-#   accuracy(truth = model, estimate = .pred_class)
-# svm_rad_acc
-# 
-# augment(uc_svm_rad_res, new_data = uc_train) %>% 
-#   roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+```{r, eval = FALSE}
+svm_rad_acc <- augment(uc_svm_rad_res, new_data = uc_train) %>%
+  accuracy(truth = model, estimate = .pred_class)
+svm_rad_acc
 
-#commented out the accuracy/ROC_AUC code because it takes a long time to run and made knitting difficult. I recorded the values in the text below.
+augment(uc_svm_rad_res, new_data = uc_train) %>%
+  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
 
+#I do not run this code in the knitted document to save time. The resulting values are recorded below.
 ```
 
 The radial SVM got an accuracy of 0.327 and an ROC_AUC of 0.745. Slightly better accuracy than the basic model and the other SVMs, but slightly worse ROC_AUC those models too.
