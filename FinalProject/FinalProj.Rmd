@@ -539,18 +539,41 @@ augment(bst_final_fit, new_data = uc_train) %>%
 The final boosted tree model had an accuracy of 0.575 and an ROC_AUC of 0.9432. Not amazing, and not as good as the random forest, but far better than any of the other options.
 
 ### Best Model
+
 Finally, it's time to pick the best model and try it on the test data - data the model has never seen. Based on both accuracy and ROC_AUC, the random forest model was the best by far.
 
 ```{r}
-augment(reg_tree_final_fit1, new_data = uc_test) %>% 
-  roc_auc(model, .pred_Accord:.pred_Silverado_1500)
+rf_test_acc <- augment(reg_tree_final_fit1, new_data = uc_test) %>% 
+  accuracy(truth = model, estimate = .pred_class)
+rf_test_acc
 
+augment(reg_tree_final_fit1, new_data = uc_test) %>% 
+  roc_auc(model, .pred_Accord:.pred_Silverado_1500) 
+
+```
+When fit to the test data, the random forest model got an accuracy of 0.296 and an ROC_AUC of 0.840. This was a pretty substantial drop from the values the same random forest model got on the training set, which were 0.725 and 0.979 respectively. This suggests that despite the measures taken with k-fold cross validation, the model was overfit to the training data, and did not perform well when making predictions based on new data.
+
+To dig a little deeper, I investigated the ROC_AUC curves for each possible value of the outcome variable. Ideally, each curve would approach the top left corner, which corresponds to an ROC_AUC of 1. A poorly performing model would have a curve along x=y, which corresponds to an ROC_AUC of 0.5
+
+```{r}
 augment(reg_tree_final_fit1, new_data = uc_test) %>%
   roc_curve(model, .pred_Accord:.pred_Silverado_1500) %>%
-  autoplot()
+  autoplot() + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+```
 
+For some car models, like the Corolla and the Ford F-150, the ROC curves look pretty good. However, this is not the case in all of the graphs - The Accord, the Camry, and the Escape are all pretty far off from that top left corner. 
+
+The last thing I checked was a confusion matrix, showing the model's predictions versus the true classification. A good model should have high numbers along the diagonal, which corresponds to the prediction being equivalent to the truth, and low numbers everywhere else.
+```{r}
 augment(reg_tree_final_fit1, new_data = uc_test) %>%
   conf_mat(truth = model, estimate = .pred_class) %>% 
-  autoplot(type = 'heatmap') 
+  autoplot(type = 'heatmap') + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
 ```
+
+
+
+There is somewhat of a concentration along the diagonal, so it is clear the model was not blindly guessing. However, there are many scattered values across the board that are not insignificant. This matrix also agrees with the observations made from the ROC_AUC curves. The Corolla and the F-150 predictions seem more concentrated along the diagonal, but the Accord, the Camry, and the Escape are all over the place. 
+
+One thing that stood out to me was that the model made a lot of wrong predictions between the F-150, the Ram 1500, and the Silverado 1500 - it often chose one of these other two car models to predict the third. All three of these models are trucks, so there must be some relatioship across the predictor variables that allow it to hone in on trucks in general, but struggle to make further distinctions.
 
