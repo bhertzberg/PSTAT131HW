@@ -1,10 +1,12 @@
 ---
-title: "FinalProject"
+title: "Final Project"
 author: "Ben Hertzberg"
 date: "2022-11-28"
 output: 
   html_document:
     code_folding: hide
+    toc: true
+    theme: united
 ---
 
 ```{r setup, include=FALSE}
@@ -131,7 +133,7 @@ type_1_plot
 
 Much better. My next exploratory mission was to see how the continuous variables in my data set are correlated. 
 
-```{r}
+```{r, warning=FALSE}
 common_models %>% 
   dplyr::select(is.numeric) %>% 
   cor(use = "complete.obs") %>% 
@@ -164,7 +166,7 @@ The histograms for the Accord, CR-V, and Grand Cherokee are clearly skewed left.
 
 The last thing standing between me and model training was splitting the data. I set my random seed to be able to reproduce the same split in the future, and divided my data in what is called the initial split.
 
-```{r}
+```{r, warning=FALSE}
 set.seed(619)
 uc_split <- initial_split(common_models, prop = 0.80, strata = model, pool = 0.01)
 uc_train <- training(uc_split)
@@ -370,7 +372,7 @@ The random forest model got an accuracy of 0.725 and an ROC_ACU of 0.979. Not ba
 
 ### Third Model
 
-The third model is a linear support vector machine, known as an SVM. I created a workflow, prepared to tune the hyperparameter cost, and create a grid of 10 values for that hyperparameter. Then I tuned the model and saved the results.
+The third model is a linear support vector machine, known as an SVM. I created a workflow, prepared to tune the hyperparameter cost, and create a grid of 10 values for that hyperparameter. 
 
 ```{r}
 svm_linear_spec <- svm_poly(degree = 1) %>%
@@ -383,6 +385,8 @@ svm_linear_wf <- workflow() %>%
 
 svm_param_grid <- grid_regular(cost(), levels = 10)
 ```
+
+Then I tuned the model and saved the results.
 
 ```{r, eval = FALSE}
 tune_res <- tune_grid(
@@ -418,6 +422,8 @@ svm_final_fit1 <- fit(svm_final, data = uc_train)
 write_rds(svm_final_fit1, file = 'SavedModels/uc_svm_final_fit.rds')
 ```
 
+I saved the final linear SVM fit to save time while knitting.
+
 ```{r}
 lin_svm_final_fit_res<- read_rds(file = 'SavedModels/uc_svm_final_fit.rds')
 ```
@@ -439,8 +445,6 @@ The linear SVM got an accuracy of 0.209 and an ROC_AUC of 0.753. This is worse t
 
 The lectures for this course did not fully cover SVMs, so I couldn't analyze this result as well as I would have liked to. However, my best guess was that I used a linear SVM to try and model a non linear relationship, so I took another crack at it with a polynomial SVM. Ideally, I would have set the hyperparameter 'degree' to be tuned, but something about training the SVMs took an extremely long time, and my computer would not have been able to handle it. So I left 'cost' as the only hyperparameter to be tuned, and specified degree to be 4 (as opposed to 1, which was its value for the linear case). I chose 4 because there are four predictors in the recipe, but without more time to learn about SVMs in class, this choice was rather arbitrary.
 
-The process is the same as for the linear case, with degree set to equal 4 instead of 1.
-
 ```{r}
 svm_poly_spec <- svm_poly() %>%
   set_mode("classification") %>%
@@ -452,6 +456,8 @@ svm_poly_wf <- workflow() %>%
 
 svm_poly_param_grid <- grid_regular(cost(), levels = 10)
 ```
+
+Once again, I trained and tuned some SVM models. The process is the same as for the linear case, with degree set to equal 4 instead of 1.
 
 ```{r, eval = FALSE}
 svm_poly_tune_res <- tune_grid(
@@ -480,10 +486,13 @@ poly_svm_final_fit1 <- fit(poly_svm_final, data = uc_train)
 
 write_rds(poly_svm_final_fit1, file = 'SavedModels/uc_poly_svm_final_fit.rds')
 ```
+I saved the final fit to save time in the knit process.
 
 ```{r}
 poly_svm_final_fit_res<- read_rds(file = 'SavedModels/uc_poly_svm_final_fit.rds')
 ```
+
+Then I checked how the best polynomial SVM performed.
 
 ```{r, eval = FALSE}
 poly_svm_acc <- augment(poly_svm_final_fit_res, new_data = uc_train) %>%
